@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily PixelForge sync from GitHub (04:00 America/Sao_Paulo = 07:00 UTC)
+
+[Timer]
+OnCalendar=*-*-* 07:00:00 UTC
+Persistent=true
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,8 @@
+[Unit]
+Description=PixelForge - sync from GitHub and restart if updated
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/root/pixelforge/deploy_sync.sh
