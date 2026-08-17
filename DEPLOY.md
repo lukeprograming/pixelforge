@@ -197,6 +197,53 @@ Se usou a Opção B (zip), repete o scp + unzip por cima e depois:
 systemctl restart pixelforge
 ```
 
+## Sincronizar VPS → PC local (scp/rsync)
+
+Durante o desenvolvimento, algumas mudanças foram aplicadas **direto na
+VPS** (via `nano` ou `cat > arquivo << 'EOF'` no terminal SSH), sem passar
+primeiro pelo GitHub — geralmente porque o PC do trabalho tinha problemas
+de conexão SSH com a VPS, mas o GitHub via HTTPS funcionava normalmente.
+Isso significa que, em vários pontos, **a VPS ficou com código mais
+atualizado que o repositório GitHub**.
+
+Pra trazer esse estado da VPS de volta pro PC local (e daí sim commitar
+pro GitHub), existem duas formas, rodando do terminal do **PC local**
+(não da VPS):
+
+**scp — copia a pasta inteira:**
+```bash
+scp -r root@89.116.225.87:~/pixelforge ./pixelforge_vps
+```
+
+**rsync — mais inteligente, ignora lixo (venv, cache, .git):**
+```bash
+rsync -avz --exclude='.venv' --exclude='__pycache__' --exclude='.git' \
+  root@89.116.225.87:~/pixelforge/ ./pixelforge_vps/
+```
+
+Depois de baixado, sincroniza com o repositório clonado do GitHub e
+commita normalmente:
+```bash
+cd sua-pasta-do-repo-github
+cp -r ../pixelforge_vps/* .
+git add -A
+git commit -m "sync: aplica mudancas feitas direto na VPS"
+git push
+```
+
+**Pré-requisito:** o SSH do PC local precisa conseguir conectar na VPS
+(mesmo `ssh root@89.116.225.87` usado normalmente). Testa antes com:
+```bash
+ssh root@89.116.225.87 "echo teste ok"
+```
+Se responder `teste ok`, o `scp`/`rsync` também vai funcionar, já que usam
+o mesmo protocolo/porta (22).
+
+**Direção inversa (PC local → VPS)** também é possível com os mesmos
+comandos invertendo origem/destino — útil depois que o GitHub estiver de
+novo como fonte de verdade e a VPS precisar só de um `git pull` (fluxo
+normal, ver seção anterior) em vez de scp.
+
 ## Checklist rápido de problemas comuns
 
 - **502 Bad Gateway no Nginx** → o serviço `pixelforge` não está

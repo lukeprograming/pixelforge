@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+backend/data/sprites/*.json
+backend/data/exports/*.png
+.DS_Store

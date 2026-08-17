@@ -172,11 +172,15 @@ input#sprite-w, input#sprite-h { width: 56px; }
   image-rendering: pixelated;
 }
 
-#checker, #sprite-canvas {
+#checker, #reference, #sprite-canvas, #grid {
   position: absolute;
   top: 0;
   left: 0;
   image-rendering: pixelated;
+}
+
+#grid {
+  pointer-events: none;
 }
 
 .statusbar {

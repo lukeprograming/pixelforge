@@ -9,6 +9,9 @@ const PaletteManager = {
   setColors(colors) {
     this.colors = colors.slice(0, MAX_PALETTE_COLORS);
     if (this.selectedIndex >= this.colors.length) this.selectedIndex = this.colors.length - 1;
+    // se nada estava selecionado ainda, seleciona a primeira cor por padrão
+    // (evita o lápis "desenhar" com índice -1 = transparente sem o usuário perceber)
+    if (this.selectedIndex < 0 && this.colors.length > 0) this.selectedIndex = 0;
     this.render();
   },
 
@@ -28,6 +31,33 @@ const PaletteManager = {
   select(index) {
     this.selectedIndex = index;
     this.render();
+    // conveniência: também preenche o seletor de cor com a cor selecionada,
+    // facilitando ajustar/duplicar uma cor próxima em vez de digitar do zero
+    if (index >= 0 && this.colors[index]) {
+      const picker = document.getElementById("new-color");
+      if (picker) picker.value = this.colors[index].slice(0, 7); // input color só aceita RGB, sem alpha
+    }
+  },
+
+  // usado pelo conta-gotas ao capturar cor da camada de referência: se a
+  // cor já existe na paleta, só seleciona; senão adiciona (respeitando o
+  // limite) e já seleciona a nova
+  addOrSelectColor(hexRgba) {
+    const normalized = hexRgba.toLowerCase();
+    const existingIndex = this.colors.findIndex((c) => c.toLowerCase() === normalized);
+    if (existingIndex >= 0) {
+      this.select(existingIndex);
+      return existingIndex;
+    }
+    if (this.colors.length >= MAX_PALETTE_COLORS) {
+      alert(`Limite de ${MAX_PALETTE_COLORS} cores atingido — não foi possível capturar a cor.`);
+      return -1;
+    }
+    this.colors.push(normalized);
+    this.selectedIndex = this.colors.length - 1;
+    this.render();
+    this.onChange?.(this.colors);
+    return this.selectedIndex;
   },
 
   render() {
@@ -54,4 +84,9 @@ function hexToCss(hex) {
   const b = parseInt(h.slice(4, 6), 16);
   const a = h.length >= 8 ? parseInt(h.slice(6, 8), 16) / 255 : 1;
   return `rgba(${r},${g},${b},${a})`;
+}
+
+function rgbaToHex(r, g, b, a) {
+  const toHex = (n) => n.toString(16).padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}${toHex(a)}`;
 }

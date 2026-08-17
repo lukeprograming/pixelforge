@@ -27,8 +27,8 @@ class Frame(BaseModel):
 
 class Sprite(BaseModel):
     id: str
-    width: int = Field(gt=0, le=256)
-    height: int = Field(gt=0, le=256)
+    width: int = Field(gt=0, le=4096)
+    height: int = Field(gt=0, le=4096)
     palette: List[str] = Field(default_factory=list)  # hex "#RRGGBBAA"
     frames: List[Frame]
     tags: List[str] = Field(default_factory=list)
@@ -45,8 +45,8 @@ class Sprite(BaseModel):
 
 class SpriteCreate(BaseModel):
     id: str
-    width: int = Field(gt=0, le=256)
-    height: int = Field(gt=0, le=256)
+    width: int = Field(gt=0, le=4096)
+    height: int = Field(gt=0, le=4096)
     palette: Optional[List[str]] = None
 
 

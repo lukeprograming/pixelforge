@@ -16,9 +16,9 @@
 
       <div class="sprite-controls">
         <input id="sprite-id" type="text" placeholder="id-do-sprite" value="novo_sprite" />
-        <input id="sprite-w" type="number" min="1" max="256" value="40" title="largura" />
+        <input id="sprite-w" type="number" min="1" max="4096" value="40" title="largura" />
         <span class="dim-x">×</span>
-        <input id="sprite-h" type="number" min="1" max="256" value="40" title="altura" />
+        <input id="sprite-h" type="number" min="1" max="4096" value="40" title="altura" />
         <button id="btn-new" class="btn">Novo</button>
         <button id="btn-load" class="btn">Abrir</button>
         <button id="btn-save" class="btn btn-primary">Salvar</button>
@@ -49,19 +49,58 @@
           Espelho vertical (eixo X)
         </label>
 
+        <label class="toggle">
+          <input type="checkbox" id="axis-lock" />
+          Trava de eixo (linha reta)
+        </label>
+
+        <h3>Pincel</h3>
+        <input id="brush-size" type="range" min="1" max="8" value="1" />
+        <span id="brush-size-label">1px</span>
+
+        <h3>Referência (decalque)</h3>
+        <input id="ref-file" type="file" accept="image/*" />
+        <label class="toggle">
+          <input type="checkbox" id="ref-visible" checked />
+          Mostrar referência
+        </label>
+        <input id="ref-opacity" type="range" min="0" max="100" value="50" />
+        <span id="ref-opacity-label">50%</span>
+        <button id="btn-ref-clear" class="btn">Remover referência</button>
+        <button id="btn-extract-palette" class="btn btn-primary">🎨 Extrair paleta da referência</button>
+
         <h3>Zoom</h3>
         <input id="zoom" type="range" min="4" max="32" value="14" />
         <span id="zoom-label">14×</span>
 
+        <h3>Fundo do canvas</h3>
+        <select id="canvas-bg">
+          <option value="dark" selected>Escuro (padrão)</option>
+          <option value="light">Claro</option>
+          <option value="white">Branco sólido</option>
+          <option value="black">Preto sólido</option>
+        </select>
+
+        <h3>Grade (grid)</h3>
+        <label class="toggle">
+          <input type="checkbox" id="grid-visible" checked />
+          Mostrar grade
+        </label>
+        <input id="grid-spacing" type="range" min="1" max="8" value="1" />
+        <span id="grid-spacing-label">a cada 1px</span>
+
         <h3>Ações</h3>
         <button id="btn-undo" class="btn">↶ Desfazer</button>
+        <button id="btn-redo" class="btn">↷ Refazer</button>
         <button id="btn-clear" class="btn btn-danger">Limpar canvas</button>
       </aside>
 
       <section class="canvas-area">
         <div id="canvas-wrap" class="canvas-wrap">
           <canvas id="checker" ></canvas>
+          <canvas id="reference"></canvas>
           <canvas id="sprite-canvas"></canvas>
+          <canvas id="grid"></canvas>
         </div>
         <div class="statusbar">
           <span id="cursor-pos">x: -, y: -</span>
