@@ -113,9 +113,31 @@ opacidade própria).
 - Itens segurados (espada, varinha): desenhados já na diagonal (~45°) com canvas quadrado — **não é regra universal**, formatos largos (picareta, machado) ou de pontas múltiplas (tridente) desviam bastante, alguns ficando quase horizontais.
 - **Validado nesta sessão:** conseguimos importar uma spritesheet de animação completa do Terraria base (antes bloqueada pelo limite de 256px) após o aumento do limite de dimensão para 4096px.
 
+## Deploy automático (GitHub → VPS)
+
+Desde 17/08/2026, a VPS não depende mais de sincronização manual via `scp`/`nano`.
+Fluxo atual:
+
+1. Qualquer commit em `main` no GitHub (`lukeprograming/pixelforge`) é a fonte de
+   verdade — parar de editar direto na VPS.
+2. Um systemd timer (`pixelforge-sync.timer`, `/etc/systemd/system/`) roda
+   `/root/pixelforge/deploy_sync.sh` **todo dia às 07:00 UTC (04:00 horário de
+   Brasília)**.
+3. O script faz `git fetch` + compara `HEAD` com `origin/main`. Se não mudou nada,
+   sai sem reiniciar o serviço (zero downtime na maioria dos dias). Se mudou, faz
+   `git reset --hard origin/main`, reinstala `requirements.txt` e reinicia
+   `pixelforge.service` — a janela de indisponibilidade real é de poucos segundos
+   (restart do systemd), não minutos.
+4. Log de cada execução em `/var/log/pixelforge-sync.log` na VPS.
+5. Rodar manualmente a qualquer momento (não precisa esperar o horário):
+   `ssh root@89.116.225.87 systemctl start pixelforge-sync.service`.
+
 ## Próximos passos (ordem sugerida)
 
-1. Confirmar `git push` feito no GitHub, sincronizando com o que já roda na VPS.
+1. ~~Confirmar `git push` feito no GitHub, sincronizando com o que já roda na VPS.~~
+   ✅ feito em 17/08/2026 — GitHub, VPS e o snapshot local agora batem, incluindo
+   undo/redo, toggle de fundo do canvas e atalhos numéricos que só existiam no
+   snapshot antes.
 2. Configuração de domínio + HTTPS (certbot), se/quando tiver domínio apontado para `89.116.225.87`.
 3. **Estudo por categoria (novo foco a partir de 20/08 com o Codex)** — ver `docs/ANIMATION_RULES_BY_CATEGORY.md`: generalizar os padrões já confirmados item a item em regras por categoria (armadura leve vs pesada/detalhada, arma pequena vs grande, lâmina fina vs cabeça larga vs pontas múltiplas). Framework e perguntas em aberto já documentados, faltam mais exemplos de sprite pra confirmar cada hipótese.
 4. Peitoral (torso) e wings (corpo animado) seguem como as peças de maior prioridade ainda não mapeadas — mencionadas desde o início como as mais complexas.
