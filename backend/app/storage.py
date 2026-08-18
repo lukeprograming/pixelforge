@@ -65,6 +65,7 @@ def list_summaries() -> List[SpriteSummary]:
                 height=sprite.height,
                 frame_count=len(sprite.frames),
                 palette_size=len(sprite.palette),
+                kind=sprite.kind,
                 tags=sprite.tags,
                 created_at=sprite.created_at,
                 updated_at=sprite.updated_at,

@@ -22,7 +22,11 @@ from fastapi.staticfiles import StaticFiles
 
 from . import png_export, storage
 from .models import (
+    ExportToAnimated,
     Frame,
+    FrameDuplicate,
+    FrameDuplicateResult,
+    PaletteColorDelete,
     PaletteUpdate,
     PixelEdit,
     RegionEdit,
@@ -30,6 +34,13 @@ from .models import (
     SpriteCreate,
     SpriteSummary,
 )
+
+_GRID_DIRECTIONS = {
+    "left": (-1, 0),
+    "right": (1, 0),
+    "up": (0, -1),
+    "down": (0, 1),
+}
 
 app = FastAPI(
     title="PixelForge API",
@@ -168,6 +179,30 @@ def update_palette(sprite_id: str, payload: PaletteUpdate) -> Sprite:
     return sprite
 
 
+@app.post("/api/sprites/{sprite_id}/palette/delete-color", response_model=Sprite)
+def delete_palette_color(sprite_id: str, payload: PaletteColorDelete) -> Sprite:
+    """Remove uma cor da paleta pelo índice e remapeia TODOS os frames: pixels
+    que usavam essa cor viram transparentes, e índices maiores decrescem 1
+    pra continuar apontando pra cor certa. Feito no backend (não no cliente)
+    porque um sprite animated pode ter vários frames que o editor não tem
+    carregados localmente ao mesmo tempo."""
+    sprite = _get_sprite_or_404(sprite_id)
+    if not (0 <= payload.index < len(sprite.palette)):
+        raise HTTPException(400, "Índice de cor inexistente")
+
+    del sprite.palette[payload.index]
+    for frame in sprite.frames:
+        for row in frame.pixels:
+            for x, v in enumerate(row):
+                if v == payload.index:
+                    row[x] = -1
+                elif v > payload.index:
+                    row[x] = v - 1
+
+    storage.save(sprite)
+    return sprite
+
+
 @app.get("/api/sprites/{sprite_id}/frame/{frame_index}", response_model=Frame)
 def get_frame(sprite_id: str, frame_index: int) -> Frame:
     sprite = _get_sprite_or_404(sprite_id)
@@ -184,6 +219,61 @@ def add_frame(sprite_id: str, name: Optional[str] = None) -> Sprite:
     sprite.frames.append(Frame(name=name or f"frame_{len(sprite.frames)}", pixels=pixels))
     storage.save(sprite)
     return sprite
+
+
+@app.post("/api/sprites/{sprite_id}/export-to-animated", response_model=Sprite)
+def export_to_animated(sprite_id: str, payload: ExportToAnimated) -> Sprite:
+    """Cria um sprite NOVO e separado (kind="animated"), copiando o frame
+    indicado do sprite de origem como o primeiro frame (posição 0,0) da
+    grade. O sprite de origem não é alterado."""
+    source = _get_sprite_or_404(sprite_id)
+    if storage.load(payload.new_id) is not None:
+        raise HTTPException(409, f"Sprite '{payload.new_id}' já existe")
+    if payload.frame >= len(source.frames):
+        raise HTTPException(400, "Frame inexistente")
+
+    pixels = [list(row) for row in source.frames[payload.frame].pixels]
+    new_sprite = Sprite(
+        id=payload.new_id,
+        width=source.width,
+        height=source.height,
+        palette=list(source.palette),
+        kind="animated",
+        frames=[Frame(name="frame_0", pixels=pixels, grid_x=0, grid_y=0)],
+    )
+    storage.save(new_sprite)
+    return new_sprite
+
+
+@app.post("/api/sprites/{sprite_id}/frame/duplicate", response_model=FrameDuplicateResult)
+def duplicate_frame(sprite_id: str, payload: FrameDuplicate) -> FrameDuplicateResult:
+    """Duplica um frame pra a célula vizinha (esquerda/direita/cima/baixo) na
+    grade 2D do modo Animated. Se já existir um frame naquela célula, não
+    cria nada -- só devolve o índice do frame existente pro cliente trocar o
+    foco pra ele."""
+    sprite = _get_sprite_or_404(sprite_id)
+    if payload.frame_index < 0 or payload.frame_index >= len(sprite.frames):
+        raise HTTPException(400, "Frame inexistente")
+    if payload.direction not in _GRID_DIRECTIONS:
+        raise HTTPException(400, "Direção inválida (use left, right, up ou down)")
+
+    src = sprite.frames[payload.frame_index]
+    dx, dy = _GRID_DIRECTIONS[payload.direction]
+    target_x, target_y = src.grid_x + dx, src.grid_y + dy
+
+    for i, f in enumerate(sprite.frames):
+        if f.grid_x == target_x and f.grid_y == target_y:
+            return FrameDuplicateResult(sprite=sprite, frame_index=i, created=False)
+
+    new_frame = Frame(
+        name=f"frame_{len(sprite.frames)}",
+        pixels=[list(row) for row in src.pixels],
+        grid_x=target_x,
+        grid_y=target_y,
+    )
+    sprite.frames.append(new_frame)
+    storage.save(sprite)
+    return FrameDuplicateResult(sprite=sprite, frame_index=len(sprite.frames) - 1, created=True)
 
 
 # ---------------------------------------------------------------------------

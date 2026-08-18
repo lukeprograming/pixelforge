@@ -1,10 +1,23 @@
 // Gerencia a paleta de cores do sprite ativo (máximo 30 cores).
 const MAX_PALETTE_COLORS = 30;
 
+// paleta padrão de 30 cores sólidas, sempre pré-carregada em sprites novos
+// (o usuário pode apagar/trocar cor por cor depois, inclusive com o botão
+// de excluir a cor selecionada)
+const DEFAULT_PALETTE_30 = [
+  "#000000ff", "#1a1c2cff", "#333333ff", "#5d275dff", "#666666ff",
+  "#7e2553ff", "#808080ff", "#94216aff", "#999999ff", "#b13e53ff",
+  "#b3b3b3ff", "#8b4513ff", "#ccccccff", "#d4a373ff", "#ffffffff",
+  "#ef7d57ff", "#ff8552ff", "#ffcd75ff", "#ffe762ff", "#a7f070ff",
+  "#63c74dff", "#38b764ff", "#0eaf9bff", "#257179ff", "#193d3fff",
+  "#29366fff", "#3b5dc9ff", "#147df5ff", "#41a6f6ff", "#73eff7ff",
+];
+
 const PaletteManager = {
   colors: [], // array de "#rrggbbaa"
   selectedIndex: -1, // -1 = transparente/borracha
   onChange: null, // callback(colors)
+  isLocked: null, // callback(index) => bool, injetado pelo app.js (estado da ferramenta de máscara)
 
   setColors(colors) {
     this.colors = colors.slice(0, MAX_PALETTE_COLORS);
@@ -67,10 +80,12 @@ const PaletteManager = {
     grid.innerHTML = "";
 
     this.colors.forEach((hex, i) => {
+      const locked = this.isLocked?.(i);
       const sw = document.createElement("div");
-      sw.className = "swatch" + (i === this.selectedIndex ? " selected" : "");
+      sw.className =
+        "swatch" + (i === this.selectedIndex ? " selected" : "") + (locked ? " locked" : "");
       sw.style.setProperty("--swatch-color", hexToCss(hex));
-      sw.title = hex;
+      sw.title = hex + (locked ? " (travada)" : "");
       sw.addEventListener("click", () => this.select(i));
       grid.appendChild(sw);
     });

@@ -172,14 +172,14 @@ input#sprite-w, input#sprite-h { width: 56px; }
   image-rendering: pixelated;
 }
 
-#checker, #reference, #sprite-canvas, #grid {
+#checker, #reference, #sprite-canvas, #grid, #lock-overlay {
   position: absolute;
   top: 0;
   left: 0;
   image-rendering: pixelated;
 }
 
-#grid {
+#grid, #lock-overlay {
   pointer-events: none;
 }
 
@@ -191,6 +191,19 @@ input#sprite-w, input#sprite-h { width: 56px; }
 }
 
 /* ---------- palette ---------- */
+
+.palette-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.palette-header-row h3 { margin: 0; }
+.palette-header-row .btn {
+  padding: 3px 8px;
+  font-size: 12px;
+  line-height: 1;
+}
 
 .palette-grid {
   display: grid;
@@ -221,6 +234,17 @@ input#sprite-w, input#sprite-h { width: 56px; }
   background: var(--swatch-color, transparent);
 }
 .swatch.selected { outline: 2px solid var(--accent); outline-offset: 1px; }
+.swatch.locked { border-color: var(--danger); }
+.swatch.locked::before {
+  content: "🔒";
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  font-size: 9px;
+  line-height: 1;
+  z-index: 2;
+  filter: drop-shadow(0 0 1px #000);
+}
 
 .palette-add {
   display: flex;
@@ -250,6 +274,60 @@ input#sprite-w, input#sprite-h { width: 56px; }
   max-height: 260px;
   overflow-y: auto;
 }
+
+/* ---------- barra do modo Animated ---------- */
+
+.animated-bar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 10px 16px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+.animated-bar.hidden { display: none; }
+
+.animated-bar-label {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.animated-directions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.animated-directions-row { display: flex; gap: 2px; }
+.animated-directions .btn { padding: 4px 8px; }
+
+.animated-grid {
+  display: grid;
+  gap: 2px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  padding: 2px;
+  border-radius: 4px;
+  overflow: auto;
+  flex-shrink: 0;
+}
+
+.animated-thumb {
+  display: block;
+  image-rendering: pixelated;
+  background: var(--bg-2);
+  cursor: pointer;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+}
+.animated-thumb:hover { outline-color: var(--text-dim); }
+.animated-thumb.active { outline-color: var(--accent); }
 
 /* ---------- galeria (modal) ---------- */
 

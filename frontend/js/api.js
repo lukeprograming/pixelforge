@@ -1,10 +1,10 @@
 // Camada fina sobre fetch() para a API do PixelForge.
 const Api = {
-  async createSprite(id, width, height) {
+  async createSprite(id, width, height, palette) {
     const res = await fetch("/api/sprites", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, width, height }),
+      body: JSON.stringify({ id, width, height, palette }),
     });
     if (!res.ok) throw new Error(await res.text());
     return res.json();
@@ -52,6 +52,36 @@ const Api = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ palette }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  async deleteColor(id, index) {
+    const res = await fetch(`/api/sprites/${encodeURIComponent(id)}/palette/delete-color`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ index }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  async exportToAnimated(id, newId, frame = 0) {
+    const res = await fetch(`/api/sprites/${encodeURIComponent(id)}/export-to-animated`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ new_id: newId, frame }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  async duplicateFrame(id, frameIndex, direction) {
+    const res = await fetch(`/api/sprites/${encodeURIComponent(id)}/frame/duplicate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ frame_index: frameIndex, direction }),
     });
     if (!res.ok) throw new Error(await res.text());
     return res.json();

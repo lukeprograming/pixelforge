@@ -37,6 +37,19 @@
       </div>
     </header>
 
+    <div id="animated-bar" class="animated-bar hidden">
+      <div class="animated-bar-label">🎞️ Animated <span id="animated-sprite-name" class="muted"></span></div>
+      <div class="animated-directions">
+        <button id="dup-up" class="btn" title="Duplicar o frame atual pra cima">⬆️</button>
+        <div class="animated-directions-row">
+          <button id="dup-left" class="btn" title="Duplicar o frame atual pra esquerda">⬅️</button>
+          <button id="dup-right" class="btn" title="Duplicar o frame atual pra direita">➡️</button>
+        </div>
+        <button id="dup-down" class="btn" title="Duplicar o frame atual pra baixo">⬇️</button>
+      </div>
+      <div id="animated-grid" class="animated-grid"></div>
+    </div>
+
     <main class="workspace">
       <aside class="panel tools">
         <h3>Ferramentas</h3>
@@ -44,6 +57,20 @@
         <button class="tool-btn" data-tool="fill" title="Balde">🪣 Balde</button>
         <button class="tool-btn" data-tool="eyedropper" title="Conta-gotas">💧 Conta-gotas</button>
         <button class="tool-btn" data-tool="eraser" title="Borracha (transparente)">⌫ Borracha</button>
+        <button
+          class="tool-btn"
+          data-tool="mask-color"
+          title="Máscara por cor: clique num pixel trava/destrava TODOS os pixels daquela cor. Shift+clique = trava várias cores ao mesmo tempo."
+        >
+          🔒 Máscara cor
+        </button>
+        <button
+          class="tool-btn"
+          data-tool="mask-pixel"
+          title="Máscara por pixel: clique trava/destrava só aquele pixel. Shift+clique = trava vários pixels ao mesmo tempo."
+        >
+          📌 Máscara pixel
+        </button>
 
         <label class="toggle">
           <input type="checkbox" id="mirror-x" />
@@ -94,6 +121,9 @@
         <button id="btn-undo" class="btn">↶ Desfazer</button>
         <button id="btn-redo" class="btn">↷ Refazer</button>
         <button id="btn-clear" class="btn btn-danger">Limpar canvas</button>
+        <button id="btn-export-animated" class="btn" title="Cria um sprite Animated novo e separado a partir do desenho atual">
+          📤 Exportar p/ Animated
+        </button>
       </aside>
 
       <section class="canvas-area">
@@ -102,6 +132,7 @@
           <canvas id="reference"></canvas>
           <canvas id="sprite-canvas"></canvas>
           <canvas id="grid"></canvas>
+          <canvas id="lock-overlay"></canvas>
         </div>
         <div class="statusbar">
           <span id="cursor-pos">x: -, y: -</span>
@@ -110,7 +141,10 @@
       </section>
 
       <aside class="panel palette">
-        <h3>Paleta <span id="palette-count" class="muted"></span></h3>
+        <div class="palette-header-row">
+          <h3>Paleta <span id="palette-count" class="muted"></span></h3>
+          <button id="btn-delete-color" class="btn btn-danger" title="Excluir a cor selecionada (pixels dela viram transparentes)">🗑</button>
+        </div>
         <div id="palette-grid" class="palette-grid"></div>
         <div class="palette-add">
           <input id="new-color" type="color" value="#ff0055" />

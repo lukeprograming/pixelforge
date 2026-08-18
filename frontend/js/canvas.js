@@ -126,6 +126,41 @@ const GridOverlay = {
   },
 };
 
+// Overlay visual da ferramenta de máscara: tinge de vermelho translúcido
+// qualquer pixel protegido, seja por cor (AppState.lockedColors, resolvido
+// contra a cor atual de cada pixel) ou por coordenada exata
+// (AppState.lockedPixels). Puramente visual, não bloqueia nada por si só --
+// quem bloqueia a edição de fato é o isLocked() em app.js.
+const LockOverlay = {
+  el: null,
+  ctx: null,
+
+  init() {
+    this.el = document.getElementById("lock-overlay");
+    this.ctx = this.el.getContext("2d");
+  },
+
+  render() {
+    if (!this.ctx) return;
+    this.ctx.clearRect(0, 0, this.el.width, this.el.height);
+    const lockedColors = typeof AppState !== "undefined" ? AppState.lockedColors : null;
+    const lockedPixels = typeof AppState !== "undefined" ? AppState.lockedPixels : null;
+    if ((!lockedColors || lockedColors.size === 0) && (!lockedPixels || lockedPixels.size === 0)) return;
+
+    const zoom = SpriteCanvas.zoom;
+    this.ctx.fillStyle = "rgba(239,106,106,0.32)";
+    for (let y = 0; y < SpriteCanvas.height; y++) {
+      for (let x = 0; x < SpriteCanvas.width; x++) {
+        const idx = SpriteCanvas.pixels[y]?.[x];
+        const byPixel = lockedPixels?.has(`${x},${y}`);
+        const byColor = idx !== undefined && idx >= 0 && lockedColors?.has(idx);
+        if (!byPixel && !byColor) continue;
+        this.ctx.fillRect(x * zoom, y * zoom, zoom, zoom);
+      }
+    }
+  },
+};
+
 const SpriteCanvas = {
   width: 40,
   height: 40,
@@ -153,6 +188,7 @@ const SpriteCanvas = {
     this.checkerCtx = this.checkerEl.getContext("2d");
     ReferenceLayer.init();
     GridOverlay.init();
+    LockOverlay.init();
 
     this.el.addEventListener("mousedown", (e) => this._handlePointer(e, true));
     this.el.addEventListener("mousemove", (e) => this._handlePointer(e, false));
@@ -211,12 +247,20 @@ const SpriteCanvas = {
       GridOverlay.el.style.width = w + "px";
       GridOverlay.el.style.height = h + "px";
     }
+    // idem para a camada de overlay de máscara/trava
+    if (LockOverlay.el) {
+      LockOverlay.el.width = w;
+      LockOverlay.el.height = h;
+      LockOverlay.el.style.width = w + "px";
+      LockOverlay.el.style.height = h + "px";
+    }
     document.getElementById("canvas-wrap").style.width = w + "px";
     document.getElementById("canvas-wrap").style.height = h + "px";
     document.getElementById("canvas-dims").textContent = `${this.width}×${this.height}px`;
     this._renderChecker();
     ReferenceLayer.render();
     GridOverlay.render();
+    LockOverlay.render();
   },
 
   _renderChecker() {
@@ -252,6 +296,7 @@ const SpriteCanvas = {
         ctx.fillRect(x * this.zoom, y * this.zoom, this.zoom, this.zoom);
       }
     }
+    LockOverlay.render();
   },
 
   _handlePointer(e, isDown) {
@@ -280,7 +325,7 @@ const SpriteCanvas = {
 
     this.onHover?.({ x, y });
     if (isDown || e.buttons === 1) {
-      this.onPixelClick?.(x, y);
+      this.onPixelClick?.(x, y, { isDown, shiftKey: e.shiftKey });
     }
   },
 };

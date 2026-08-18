@@ -23,6 +23,12 @@ class Frame(BaseModel):
     name: str = "frame_0"
     # matriz [y][x] -> indice da paleta ou -1 (transparente)
     pixels: List[List[int]]
+    # posição do frame na grade 2D do modo Animated (0,0 = origem). Sprites
+    # estáticos (kind="static") sempre têm um único frame em (0,0) e ignoram
+    # isso; sprites animados usam pra montar a tira/grade e para saber pra
+    # onde cada duplicação (esquerda/direita/cima/baixo) deve ir.
+    grid_x: int = 0
+    grid_y: int = 0
 
 
 class Sprite(BaseModel):
@@ -32,6 +38,10 @@ class Sprite(BaseModel):
     palette: List[str] = Field(default_factory=list)  # hex "#RRGGBBAA"
     frames: List[Frame]
     tags: List[str] = Field(default_factory=list)
+    # "static" = sprite normal (1 frame, modo Desenho); "animated" = sprite
+    # dedicado ao modo Animated (grade 2D de frames), sempre um sprite
+    # separado do estático que o originou (ver /export-to-animated)
+    kind: str = "static"
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -51,6 +61,7 @@ class SpriteSummary(BaseModel):
     height: int
     frame_count: int
     palette_size: int
+    kind: str = "static"
     tags: List[str] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
@@ -88,3 +99,23 @@ class PaletteUpdate(BaseModel):
         if len(v) > MAX_PALETTE_COLORS:
             raise ValueError(f"Paleta excede o limite de {MAX_PALETTE_COLORS} cores")
         return v
+
+
+class PaletteColorDelete(BaseModel):
+    index: int
+
+
+class ExportToAnimated(BaseModel):
+    new_id: str
+    frame: int = 0
+
+
+class FrameDuplicate(BaseModel):
+    frame_index: int
+    direction: str  # "left" | "right" | "up" | "down"
+
+
+class FrameDuplicateResult(BaseModel):
+    sprite: Sprite
+    frame_index: int
+    created: bool  # False = já existia um frame naquela posição da grade; só trocamos o foco
