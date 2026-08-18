@@ -83,6 +83,41 @@ const ReferenceLayer = {
     }
     return [...counts.entries()].sort((a, b) => b[1] - a[1]);
   },
+
+  // extrai o CONTORNO da arte de referência: um pixel opaco entra no
+  // contorno se pelo menos um vizinho (4 direções) for transparente ou
+  // estiver fora da imagem. Resolução nativa (mesma usada pra definir
+  // largura/altura do sprite na importação, então mapeia 1:1 sem escala).
+  // Retorna um Set de chaves "x,y".
+  extractOutlineMask(alphaThreshold = 128) {
+    const outline = new Set();
+    if (!this.img) return outline;
+
+    const width = this.img.naturalWidth || this.img.width;
+    const height = this.img.naturalHeight || this.img.height;
+    const tmp = document.createElement("canvas");
+    tmp.width = width;
+    tmp.height = height;
+    const tctx = tmp.getContext("2d");
+    tctx.imageSmoothingEnabled = false;
+    tctx.drawImage(this.img, 0, 0);
+    const data = tctx.getImageData(0, 0, width, height).data;
+
+    const isOpaque = (x, y) => {
+      if (x < 0 || y < 0 || x >= width || y >= height) return false;
+      return data[(y * width + x) * 4 + 3] >= alphaThreshold;
+    };
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (!isOpaque(x, y)) continue;
+        if (!isOpaque(x - 1, y) || !isOpaque(x + 1, y) || !isOpaque(x, y - 1) || !isOpaque(x, y + 1)) {
+          outline.add(`${x},${y}`);
+        }
+      }
+    }
+    return outline;
+  },
 };
 
 // Overlay de grade visual: linhas finas para marcar os limites dos pixels

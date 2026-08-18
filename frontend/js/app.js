@@ -610,6 +610,43 @@ async function extractPaletteFromReference() {
     `Paleta extraída da referência: ${top.length} cores aplicadas${extra}`;
 }
 
+// pega a arte de referência, calcula onde tem/não tem pixel (máscara de
+// alpha) e desenha em preto só a BORDA (contorno) daquele desenho no sprite
+// atual -- serve de base pra colorir/desenhar em cima em vez de começar do
+// zero. Só escreve nos pixels de contorno; o resto do canvas fica intacto.
+async function extractOutlineFromReference() {
+  if (!ReferenceLayer.img) return alert("Importe uma imagem de referência primeiro.");
+  if (!AppState.spriteId) return alert("Crie ou abra um sprite primeiro.");
+
+  const outline = ReferenceLayer.extractOutlineMask();
+  if (outline.size === 0) {
+    return alert("Nenhum contorno encontrado (a referência parece vazia ou totalmente transparente).");
+  }
+
+  let blackIndex = PaletteManager.colors.findIndex((c) => c.toLowerCase() === "#000000ff");
+  if (blackIndex < 0) {
+    if (PaletteManager.colors.length >= MAX_PALETTE_COLORS) {
+      return alert(`Paleta cheia (${MAX_PALETTE_COLORS}/${MAX_PALETTE_COLORS}) e sem preto disponível pro contorno. Exclua uma cor e tente de novo.`);
+    }
+    PaletteManager.addColor("#000000");
+    blackIndex = PaletteManager.selectedIndex; // addColor já seleciona a cor recém-adicionada
+  }
+
+  pushUndoSnapshot();
+  let applied = 0;
+  for (const key of outline) {
+    const [xs, ys] = key.split(",");
+    const x = parseInt(xs, 10);
+    const y = parseInt(ys, 10);
+    if (x >= SpriteCanvas.width || y >= SpriteCanvas.height) continue; // segurança se as dimensões não baterem
+    await commitPixel(x, y, blackIndex);
+    applied++;
+  }
+
+  document.getElementById("analyze-out").textContent =
+    `Contorno extraído da referência: ${applied} pixels de borda desenhados em preto (índice ${blackIndex} da paleta).`;
+}
+
 function clearCanvas() {
   if (!confirm("Limpar todo o canvas?")) return;
   pushUndoSnapshot();
@@ -732,6 +769,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.getElementById("btn-extract-palette").addEventListener("click", extractPaletteFromReference);
+  document.getElementById("btn-extract-outline").addEventListener("click", extractOutlineFromReference);
 
   document.getElementById("zoom").addEventListener("input", (e) => {
     const z = parseInt(e.target.value, 10);
