@@ -98,7 +98,9 @@ async function paintPixel(x, y, meta = {}) {
   }
 
   if (AppState.tool === "color-eraser") {
-    if (isDown) await eraseColor(x, y); // só no clique, não a cada mousemove do arraste
+    // igual o balde de tinta, mas apagando (transparente) em vez de pintar --
+    // só a região contígua daquela cor a partir do clique, não a cor inteira no frame
+    await bucketFill(x, y, -1);
     return;
   }
 
@@ -176,36 +178,6 @@ async function bucketFill(startX, startY, newIdx) {
       await Api.setPixel(AppState.spriteId, x, y, newIdx, frame);
     } catch (err) {
       console.error("Falha ao salvar pixel do fill:", err);
-    }
-  }
-}
-
-// borracha de cor: apaga (torna transparente) TODOS os pixels do frame ativo
-// que têm a mesma cor do pixel clicado -- diferente do balde, não se limita
-// a uma região contígua. Respeita a máscara: pixels/cores travados ficam de fora.
-async function eraseColor(x, y) {
-  const target = SpriteCanvas.pixels[y]?.[x];
-  if (target === undefined || target < 0) return; // pixel vazio, nada a apagar
-
-  const touched = [];
-  for (let yy = 0; yy < SpriteCanvas.height; yy++) {
-    for (let xx = 0; xx < SpriteCanvas.width; xx++) {
-      if (SpriteCanvas.pixels[yy][xx] === target && !isLocked(xx, yy)) {
-        touched.push([xx, yy]);
-      }
-    }
-  }
-  if (touched.length === 0) return;
-
-  touched.forEach(([xx, yy]) => (SpriteCanvas.pixels[yy][xx] = -1));
-  SpriteCanvas.render();
-
-  const frame = AppState.activeFrameIndex ?? 0;
-  for (const [xx, yy] of touched) {
-    try {
-      await Api.setPixel(AppState.spriteId, xx, yy, -1, frame);
-    } catch (err) {
-      console.error("Falha ao salvar pixel da borracha de cor:", err);
     }
   }
 }
