@@ -16,7 +16,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -28,6 +28,7 @@ from .models import (
     RegionEdit,
     Sprite,
     SpriteCreate,
+    SpriteSummary,
 )
 
 app = FastAPI(
@@ -47,6 +48,32 @@ FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
 @app.get("/api/sprites")
 def list_sprites() -> List[str]:
     return storage.list_ids()
+
+
+@app.get("/api/sprites/meta", response_model=List[SpriteSummary])
+def list_sprites_meta() -> List[SpriteSummary]:
+    """Metadados leves de todos os sprites (sem a matriz de pixels), para a
+    galeria do editor. Combine com GET /api/sprites/{id}/export.png pra
+    thumbnail."""
+    return storage.list_summaries()
+
+
+@app.post("/api/sprites/import", response_model=Sprite)
+async def import_sprite(id: str = Form(...), file: UploadFile = File(...)) -> Sprite:
+    if storage.load(id) is not None:
+        raise HTTPException(409, f"Sprite '{id}' já existe")
+
+    data = await file.read()
+    try:
+        sprite = png_export.sprite_from_png(id, data)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+    if sprite.width > 4096 or sprite.height > 4096:
+        raise HTTPException(400, "Imagem excede o limite de 4096px por lado")
+
+    storage.save(sprite)
+    return sprite
 
 
 @app.post("/api/sprites", response_model=Sprite)

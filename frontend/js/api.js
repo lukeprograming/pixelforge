@@ -16,6 +16,27 @@ const Api = {
     return res.json();
   },
 
+  async listSpritesMeta() {
+    const res = await fetch("/api/sprites/meta");
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  async deleteSprite(id) {
+    const res = await fetch(`/api/sprites/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  async importSprite(id, file) {
+    const body = new FormData();
+    body.append("id", id);
+    body.append("file", file);
+    const res = await fetch("/api/sprites/import", { method: "POST", body });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
   async setPixel(id, x, y, paletteIndex, frame = 0) {
     const res = await fetch(`/api/sprites/${encodeURIComponent(id)}/pixel`, {
       method: "PATCH",

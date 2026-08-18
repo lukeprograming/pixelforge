@@ -6,15 +6,19 @@ uso por agentes (contagem de cores, bounding box real, simetria).
 
 from __future__ import annotations
 
+import io
 from pathlib import Path
 from typing import Dict, List, Tuple
 
 from PIL import Image
 
-from .models import Sprite
+from .models import Frame, Sprite
 
 EXPORT_DIR = Path(__file__).resolve().parent.parent / "data" / "exports"
 EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+
+MAX_PALETTE_COLORS = 30
+ALPHA_THRESHOLD = 128  # abaixo disso o pixel vira transparente (-1) na importação
 
 
 def _hex_to_rgba(hex_color: str) -> Tuple[int, int, int, int]:
@@ -108,3 +112,78 @@ def analyze_frame(sprite: Sprite, frame_index: int = 0) -> Dict:
         "symmetric_horizontal": symmetric_h,
         "symmetric_vertical": symmetric_v,
     }
+
+
+def _nearest_color_index(color: Tuple[int, int, int], palette_rgb: List[Tuple[int, int, int]]) -> int:
+    best_i, best_dist = 0, None
+    for i, (pr, pg, pb) in enumerate(palette_rgb):
+        r, g, b = color
+        dist = (r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2
+        if best_dist is None or dist < best_dist:
+            best_i, best_dist = i, dist
+    return best_i
+
+
+def sprite_from_png(sprite_id: str, image_bytes: bytes, max_palette: int = MAX_PALETTE_COLORS) -> Sprite:
+    """
+    Converte um PNG (ou outra imagem suportada pelo Pillow) num Sprite editável:
+    extrai dimensões, quantiza as cores pra caber no limite da paleta (30 por
+    padrão) e mapeia cada pixel pro índice de paleta mais próximo. Pixels com
+    alpha abaixo de ALPHA_THRESHOLD viram transparentes (índice -1).
+    """
+    try:
+        img = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
+    except Exception as exc:  # arquivo corrompido/formato não suportado
+        raise ValueError(f"Não foi possível ler a imagem: {exc}") from exc
+
+    width, height = img.size
+    rgba_pixels = list(img.getdata())  # row-major, len == width*height
+
+    opaque_colors = {
+        (r, g, b) for (r, g, b, a) in rgba_pixels if a >= ALPHA_THRESHOLD
+    }
+
+    if not opaque_colors:
+        palette_rgb: List[Tuple[int, int, int]] = []
+    elif len(opaque_colors) <= max_palette:
+        palette_rgb = sorted(opaque_colors)
+    else:
+        # imagem-referência com 1 pixel por cor única, quantizada pelo Pillow
+        # (MEDIANCUT) pra achar um conjunto representativo de <= max_palette cores
+        swatch = Image.new("RGB", (len(opaque_colors), 1))
+        swatch.putdata([c for c in opaque_colors])
+        quantized = swatch.quantize(colors=max_palette, method=Image.MEDIANCUT)
+        palette_rgb = quantized.convert("RGB").getdata()
+        palette_rgb = sorted(set(palette_rgb))
+
+    color_to_index: Dict[Tuple[int, int, int], int] = {}
+
+    def index_for(color: Tuple[int, int, int]) -> int:
+        cached = color_to_index.get(color)
+        if cached is not None:
+            return cached
+        if color in palette_rgb:
+            idx = palette_rgb.index(color)
+        else:
+            idx = _nearest_color_index(color, palette_rgb)
+        color_to_index[color] = idx
+        return idx
+
+    pixels: List[List[int]] = []
+    it = iter(rgba_pixels)
+    for _y in range(height):
+        row: List[int] = []
+        for _x in range(width):
+            r, g, b, a = next(it)
+            row.append(-1 if a < ALPHA_THRESHOLD else index_for((r, g, b)))
+        pixels.append(row)
+
+    palette_hex = [f"#{r:02x}{g:02x}{b:02x}ff" for (r, g, b) in palette_rgb]
+
+    return Sprite(
+        id=sprite_id,
+        width=width,
+        height=height,
+        palette=palette_hex,
+        frames=[Frame(name="frame_0", pixels=pixels)],
+    )

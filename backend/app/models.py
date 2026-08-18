@@ -43,6 +43,19 @@ class Sprite(BaseModel):
         return v
 
 
+class SpriteSummary(BaseModel):
+    """Versão leve do Sprite para listagem em galeria (sem a matriz de pixels)."""
+
+    id: str
+    width: int
+    height: int
+    frame_count: int
+    palette_size: int
+    tags: List[str] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+
+
 class SpriteCreate(BaseModel):
     id: str
     width: int = Field(gt=0, le=4096)

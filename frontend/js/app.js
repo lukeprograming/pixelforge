@@ -164,11 +164,12 @@ async function newSprite() {
   }
 }
 
-async function loadSprite() {
-  const id = document.getElementById("sprite-id").value.trim();
+async function loadSprite(id) {
+  id = (id ?? document.getElementById("sprite-id").value).trim();
   if (!id) return;
   try {
     const sprite = await Api.getSprite(id);
+    document.getElementById("sprite-id").value = id;
     AppState.spriteId = id;
     AppState.undoStack = [];
     AppState.redoStack = [];
@@ -180,6 +181,116 @@ async function loadSprite() {
     alert("Sprite não encontrado.");
   }
 }
+
+// ---------------------------------------------------------------------------
+// Galeria: lista sprites já salvos com thumbnail, abrir / excluir / importar
+// ---------------------------------------------------------------------------
+
+const Gallery = {
+  modal: null,
+  grid: null,
+  empty: null,
+
+  init() {
+    this.modal = document.getElementById("gallery-modal");
+    this.grid = document.getElementById("gallery-grid");
+    this.empty = document.getElementById("gallery-empty");
+  },
+
+  async open() {
+    this.modal.classList.remove("hidden");
+    this.grid.innerHTML = '<span class="muted">Carregando…</span>';
+    await this.refresh();
+  },
+
+  close() {
+    this.modal.classList.add("hidden");
+  },
+
+  async refresh() {
+    let sprites;
+    try {
+      sprites = await Api.listSpritesMeta();
+    } catch (err) {
+      this.grid.innerHTML = "";
+      alert("Erro ao carregar galeria: " + err.message);
+      return;
+    }
+    this.empty.classList.toggle("hidden", sprites.length > 0);
+    this.grid.innerHTML = "";
+    sprites.forEach((meta) => this.grid.appendChild(this._buildCard(meta)));
+  },
+
+  _buildCard(meta) {
+    const card = document.createElement("div");
+    card.className = "gallery-card";
+
+    const thumb = document.createElement("div");
+    thumb.className = "gallery-thumb";
+    const img = document.createElement("img");
+    img.src = Api.exportUrl(meta.id, 0, 1);
+    img.alt = meta.id;
+    img.loading = "lazy";
+    thumb.appendChild(img);
+
+    const id = document.createElement("div");
+    id.className = "gallery-card-id";
+    id.textContent = meta.id;
+
+    const info = document.createElement("div");
+    info.className = "gallery-card-meta";
+    const updated = new Date(meta.updated_at).toLocaleString();
+    info.textContent = `${meta.width}×${meta.height}px · ${meta.palette_size} cores · ${updated}`;
+
+    const actions = document.createElement("div");
+    actions.className = "gallery-card-actions";
+
+    const openBtn = document.createElement("button");
+    openBtn.className = "btn btn-primary";
+    openBtn.textContent = "Abrir";
+    openBtn.addEventListener("click", () => {
+      loadSprite(meta.id);
+      this.close();
+    });
+
+    const delBtn = document.createElement("button");
+    delBtn.className = "btn btn-danger";
+    delBtn.textContent = "Excluir";
+    delBtn.addEventListener("click", () => this._delete(meta.id));
+
+    actions.append(openBtn, delBtn);
+    card.append(thumb, id, info, actions);
+    return card;
+  },
+
+  async _delete(id) {
+    if (!confirm(`Excluir o sprite "${id}"? Essa ação não pode ser desfeita.`)) return;
+    try {
+      await Api.deleteSprite(id);
+      if (AppState.spriteId === id) AppState.spriteId = null;
+      await this.refresh();
+    } catch (err) {
+      alert("Erro ao excluir: " + err.message);
+    }
+  },
+
+  async importFile(file) {
+    const suggested = file.name.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9_-]/g, "_") || "importado";
+    const id = prompt("Id para o novo sprite:", suggested);
+    if (!id) return;
+    try {
+      const sprite = await Api.importSprite(id, file);
+      await this.refresh();
+      loadSprite(sprite.id);
+      alert(
+        `Sprite "${sprite.id}" importado: ${sprite.width}×${sprite.height}px, ${sprite.palette.length} cores na paleta.`
+      );
+      this.close();
+    } catch (err) {
+      alert("Erro ao importar: " + err.message);
+    }
+  },
+};
 
 function exportPng() {
   if (!AppState.spriteId) return alert("Crie ou abra um sprite primeiro.");
@@ -251,6 +362,23 @@ function clearCanvas() {
 
 document.addEventListener("DOMContentLoaded", () => {
   SpriteCanvas.init();
+  Gallery.init();
+
+  document.getElementById("btn-gallery").addEventListener("click", () => Gallery.open());
+  document.getElementById("btn-gallery-close").addEventListener("click", () => Gallery.close());
+  document.getElementById("gallery-modal").addEventListener("click", (e) => {
+    if (e.target.id === "gallery-modal") Gallery.close();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !document.getElementById("gallery-modal").classList.contains("hidden")) {
+      Gallery.close();
+    }
+  });
+  document.getElementById("import-file").addEventListener("change", (e) => {
+    const file = e.target.files?.[0];
+    if (file) Gallery.importFile(file);
+    e.target.value = "";
+  });
 
   SpriteCanvas.onPixelClick = (x, y) => paintPixel(x, y);
   SpriteCanvas.onHover = (pos) => {
@@ -356,7 +484,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.getElementById("btn-new").addEventListener("click", newSprite);
-  document.getElementById("btn-load").addEventListener("click", loadSprite);
+  document.getElementById("btn-load").addEventListener("click", () => loadSprite());
   document.getElementById("btn-save").addEventListener("click", () => {
     if (AppState.spriteId) alert("Salvo automaticamente a cada edição.");
   });
