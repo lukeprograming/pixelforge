@@ -7,6 +7,7 @@ uso por agentes (contagem de cores, bounding box real, simetria).
 from __future__ import annotations
 
 import io
+import math
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -221,6 +222,60 @@ def sprite_from_matrix_txt(sprite_id: str, text: str, max_palette: int = MAX_PAL
         palette=palette,
         frames=[Frame(name="frame_0", pixels=pixels)],
     )
+
+
+# tamanhos de bloco candidatos: "1 pixel de arte = NxN pixels da imagem
+# original". Cobre a faixa comum de pixelização (1x1 sem redução, até 32x32
+# pra imagens bem grandes/em alta resolução).
+DOWNSCALE_BLOCK_CANDIDATES = (1, 2, 4, 8, 16, 32)
+
+
+def analyze_pixel_grid(width: int, height: int) -> Dict:
+    """
+    Verificador de downscale: pra cada tamanho de bloco candidato, diz se
+    width/height são divisíveis por ele sem sobra (bloco "limpo") e qual
+    seria o tamanho do grid resultante. Um bloco limpo garante que a
+    redução encaixa exato no grid do app -- nenhuma coluna/linha
+    parcial sobrando na borda pra cortar ou preencher.
+    """
+    candidates = []
+    for block in DOWNSCALE_BLOCK_CANDIDATES:
+        rem_w = width % block
+        rem_h = height % block
+        candidates.append(
+            {
+                "block": block,
+                "clean": rem_w == 0 and rem_h == 0,
+                "grid_width": width // block,
+                "grid_height": height // block,
+                "leftover_x": rem_w,
+                "leftover_y": rem_h,
+            }
+        )
+
+    gcd = math.gcd(width, height)
+    clean_blocks = [b for b in range(1, gcd + 1) if gcd % b == 0]
+    power_of_two_clean = [b for b in clean_blocks if b & (b - 1) == 0]
+    suggested_block = max(power_of_two_clean) if power_of_two_clean else 1
+
+    return {
+        "width": width,
+        "height": height,
+        "gcd": gcd,
+        "clean_blocks": clean_blocks,
+        "suggested_block": suggested_block,
+        "candidates": candidates,
+    }
+
+
+def analyze_reference_image(image_bytes: bytes) -> Dict:
+    """Abre a imagem só pra ler as dimensões e rodar analyze_pixel_grid."""
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        width, height = img.size
+    except Exception as exc:  # arquivo corrompido/formato não suportado
+        raise ValueError(f"Não foi possível ler a imagem: {exc}") from exc
+    return analyze_pixel_grid(width, height)
 
 
 def _nearest_color_index(color: Tuple[int, int, int], palette_rgb: List[Tuple[int, int, int]]) -> int:

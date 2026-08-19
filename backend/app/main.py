@@ -107,6 +107,16 @@ async def import_sprite_txt(id: str = Form(...), file: UploadFile = File(...)) -
     return sprite
 
 
+@app.post("/api/tools/pixel-grid-check")
+async def pixel_grid_check(file: UploadFile = File(...)) -> JSONResponse:
+    data = await file.read()
+    try:
+        report = png_export.analyze_reference_image(data)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return JSONResponse(report)
+
+
 @app.post("/api/sprites", response_model=Sprite)
 def create_sprite(payload: SpriteCreate) -> Sprite:
     if storage.load(payload.id) is not None:

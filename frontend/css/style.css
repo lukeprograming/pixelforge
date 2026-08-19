@@ -275,6 +275,20 @@ input#sprite-w, input#sprite-h { width: 56px; }
   overflow-y: auto;
 }
 
+.pixel-grid-report {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.pixel-grid-report.hidden { display: none; }
+.pixel-grid-report .clean { color: var(--accent); }
+.pixel-grid-report .suggested { font-weight: bold; }
+
 /* ---------- barra do modo Animated ---------- */
 
 .animated-bar {

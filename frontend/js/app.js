@@ -658,6 +658,40 @@ function clearCanvas() {
   }
 }
 
+// verificador de downscale: pra cada tamanho de bloco candidato ("1 pixel
+// de arte = NxN pixels da imagem"), diz se a imagem divide limpo (sem
+// sobra) nesse bloco -- mesma lógica de backend/app/png_export.py
+// analyze_pixel_grid, calculada aqui no client pra não precisar de upload.
+const PIXEL_GRID_BLOCK_CANDIDATES = [1, 2, 4, 8, 16, 32];
+
+function gcd(a, b) {
+  return b === 0 ? a : gcd(b, a % b);
+}
+
+function renderPixelGridReport(width, height) {
+  const out = document.getElementById("pixel-grid-report");
+  const g = gcd(width, height);
+  const cleanBlocks = [];
+  for (let b = 1; b <= g; b++) if (g % b === 0) cleanBlocks.push(b);
+  const powerOfTwoClean = cleanBlocks.filter((b) => (b & (b - 1)) === 0);
+  const suggested = powerOfTwoClean.length ? Math.max(...powerOfTwoClean) : 1;
+
+  const lines = PIXEL_GRID_BLOCK_CANDIDATES.map((block) => {
+    const clean = width % block === 0 && height % block === 0;
+    const gw = Math.floor(width / block);
+    const gh = Math.floor(height / block);
+    const tag = block === suggested ? " ← sugerido" : "";
+    const mark = clean ? "✓" : "✗";
+    const detail = clean
+      ? `${gw}×${gh}`
+      : `${gw}×${gh} (sobra ${width % block}×${height % block}px)`;
+    return `${mark} ${block}×${block}: ${detail}${tag}`;
+  });
+
+  out.textContent = `Referência ${width}×${height}px — blocos limpos: ${cleanBlocks.join(", ")}\n` + lines.join("\n");
+  out.classList.remove("hidden");
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   SpriteCanvas.init();
   Gallery.init();
@@ -741,6 +775,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const h = img.naturalHeight;
         const MAX_DIM = 4096; // mesmo limite validado no backend (Sprite.width/height)
 
+        renderPixelGridReport(w, h);
+
         if (w > MAX_DIM || h > MAX_DIM) {
           alert(
             `A referência tem ${w}×${h}px, acima do limite de ${MAX_DIM}px por lado. ` +
@@ -772,6 +808,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btn-ref-clear").addEventListener("click", () => {
     ReferenceLayer.clear();
     document.getElementById("ref-file").value = "";
+    document.getElementById("pixel-grid-report").classList.add("hidden");
   });
 
   document.getElementById("btn-extract-palette").addEventListener("click", extractPaletteFromReference);

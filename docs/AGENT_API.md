@@ -173,6 +173,42 @@ célula não for `0`/hex válido, ou se a matriz usar mais de 30 cores
 únicas (limite de paleta). No editor, o botão "Importar Matriz (.txt)"
 na Galeria faz o mesmo upload.
 
+### Verificar divisibilidade pra downscale de referência
+```
+POST /api/tools/pixel-grid-check
+Content-Type: multipart/form-data
+  file: imagem.png
+```
+Não cria nem altera sprite nenhum — só lê as dimensões da imagem e diz,
+pra cada tamanho de bloco candidato (`1x1, 2x2, 4x4, 8x8, 16x16, 32x32`
+— "1 pixel de arte = NxN pixels da imagem"), se a imagem divide **limpo**
+nesse bloco (sem sobra de coluna/linha na borda). Útil antes de importar
+uma referência grande (ex: uma foto de 712×600) pra escolher um fator de
+redução que encaixa exato no grid, em vez de cortar ou deixar borda
+parcial. Retorna:
+```json
+{
+  "width": 712,
+  "height": 600,
+  "gcd": 8,
+  "clean_blocks": [1, 2, 4, 8],
+  "suggested_block": 8,
+  "candidates": [
+    { "block": 1, "clean": true, "grid_width": 712, "grid_height": 600, "leftover_x": 0, "leftover_y": 0 },
+    { "block": 8, "clean": true, "grid_width": 89, "grid_height": 75, "leftover_x": 0, "leftover_y": 0 },
+    { "block": 16, "clean": false, "grid_width": 44, "grid_height": 37, "leftover_x": 8, "leftover_y": 8 }
+  ]
+}
+```
+`clean_blocks` é a lista completa de blocos que dividem perfeitamente
+(divisores do `gcd(width, height)`); `suggested_block` é o maior deles
+que também é potência de 2 (convenção usual de pixelização). `400` se o
+arquivo não for uma imagem válida. No editor, o painel abaixo do input
+de referência mostra esse mesmo relatório automaticamente ao carregar
+uma imagem (calculado no navegador, sem chamar essa rota). **Nota:**
+essa rota só analisa — ainda não existe um endpoint que aplica o
+downscale de fato (fazer a média dos blocos NxN e reduzir a imagem).
+
 ### Exportar PNG
 ```
 GET /api/sprites/{id}/export.png?frame=0&scale=8
