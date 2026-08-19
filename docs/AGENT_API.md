@@ -134,6 +134,23 @@ quer a cor direto, sem precisar cruzar `pixels` com `palette` na mão.
 }
 ```
 
+### Exportar matriz de cores em .txt
+```
+GET /api/sprites/{id}/export.txt?frame=0
+```
+Mesmo dado do `/matrix` acima, mas como arquivo de texto pra download
+(`Content-Disposition: attachment`) em vez de JSON: uma linha por linha
+Y do frame, células separadas por vírgula, cor hex `#RRGGBBAA` ou `0`
+onde é transparente. Sem cabeçalho, sem espaços. Exemplo (frame 4×2):
+```
+#1a1a1aff,#1a1a1aff,0,0
+0,#e8d9b0ff,#e8d9b0ff,0
+```
+No editor, o botão "Exportar Matriz (.txt)" no topbar baixa esse mesmo
+arquivo para o frame ativo. Use o endpoint `/matrix` (JSON) quando for
+consumir o dado programaticamente; use `/export.txt` quando o objetivo
+for gerar um arquivo pra anexar/compartilhar.
+
 ### Exportar PNG
 ```
 GET /api/sprites/{id}/export.png?frame=0&scale=8
