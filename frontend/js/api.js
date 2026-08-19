@@ -96,4 +96,8 @@ const Api = {
   exportUrl(id, frame = 0, scale = 1) {
     return `/api/sprites/${encodeURIComponent(id)}/export.png?frame=${frame}&scale=${scale}`;
   },
+
+  exportMatrixTxtUrl(id, frame = 0) {
+    return `/api/sprites/${encodeURIComponent(id)}/export.txt?frame=${frame}`;
+  },
 };

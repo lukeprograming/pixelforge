@@ -536,6 +536,18 @@ function exportPng() {
   a.remove();
 }
 
+function exportMatrixTxt() {
+  if (!AppState.spriteId) return alert("Crie ou abra um sprite primeiro.");
+  const frame = AppState.activeFrameIndex ?? 0;
+  const url = Api.exportMatrixTxtUrl(AppState.spriteId, frame);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${AppState.spriteId}_frame${frame}_matrix.txt`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
 async function analyzeSprite() {
   if (!AppState.spriteId) return;
   try {
@@ -772,6 +784,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (AppState.spriteId) alert("Salvo automaticamente a cada edição.");
   });
   document.getElementById("btn-export").addEventListener("click", exportPng);
+  document.getElementById("btn-export-matrix").addEventListener("click", exportMatrixTxt);
   document.getElementById("btn-undo").addEventListener("click", undo);
   document.getElementById("btn-redo").addEventListener("click", redo);
   document.getElementById("btn-clear").addEventListener("click", clearCanvas);

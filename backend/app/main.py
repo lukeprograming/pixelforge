@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import png_export, storage
@@ -315,6 +315,17 @@ def get_sprite_matrix(sprite_id: str, frame: int = 0) -> JSONResponse:
             "matrix": png_export.frame_to_matrix(sprite, frame_index=frame),
         }
     )
+
+
+@app.get("/api/sprites/{sprite_id}/export.txt")
+def export_matrix_txt(sprite_id: str, frame: int = 0) -> PlainTextResponse:
+    sprite = _get_sprite_or_404(sprite_id)
+    if frame >= len(sprite.frames):
+        raise HTTPException(400, "Frame inexistente")
+    matrix = png_export.frame_to_matrix(sprite, frame_index=frame)
+    text = "\n".join(",".join(str(cell) for cell in row) for row in matrix)
+    filename = f"{sprite.id}_frame{frame}_matrix.txt"
+    return PlainTextResponse(text, headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
 # ---------------------------------------------------------------------------
