@@ -1,18 +1,66 @@
 # PixelForge — Status do projeto
 
-Última atualização: 17 de agosto de 2026 (sessão de deploy + features de referência)
+Última atualização: 19 de agosto de 2026 (sessão de export/import de
+matriz, verificador de downscale e paleta destravável)
+
+## Sessão de 19/08/2026 (Claude Code)
+
+Resumo do que foi feito e validado nesta sessão, tudo já commitado no
+GitHub e no ar na VPS (`pixelforge.service` reiniciado a cada mudança):
+
+1. **Fix: referência não distorce mais.** `ReferenceLayer.render()`
+   (`frontend/js/canvas.js`) esticava a imagem de referência pra
+   preencher exatamente largura×altura do canvas, distorcendo a
+   proporção (ex: 50×30 virava 50×50). Agora usa contain-fit: encaixa
+   pelo maior lado, centraliza, sem distorcer. `getColorAt()` (conta-gotas
+   sobre a referência) foi ajustado pra amostrar do mesmo retângulo.
+2. **`GET /api/sprites/{id}/matrix`** — matriz `[y][x]` já resolvida em
+   cor hex ou `0` (transparente), sem precisar cruzar `pixels`×`palette`
+   na mão.
+3. **`GET /api/sprites/{id}/export.txt`** — mesma matriz como arquivo
+   `.txt` pra download (CSV: linha por linha Y, cor hex ou `0`). Botão
+   "Exportar Matriz (.txt)" no topbar.
+4. **`POST /api/sprites/import-txt`** — caminho inverso: sobe um `.txt`
+   nesse mesmo formato e cria um sprite novo. Auto-ajusta matriz
+   não-quadrada pro maior lado (ex: 60×40 → 60×60), centralizada, resto
+   transparente. Botão "Importar Matriz (.txt)" na Galeria.
+5. **`POST /api/tools/pixel-grid-check`** — verificador de downscale:
+   dado o tamanho de uma imagem, diz quais blocos (1×1 até 32×32)
+   dividem sem sobra, pra escolher fator de redução que encaixa exato no
+   grid. No editor, calculado no client e mostrado automaticamente ao
+   carregar uma referência (painel abaixo do input de arquivo). Ainda
+   **não aplica** o downscale de fato, só analisa.
+6. **Paleta destravável.** `Sprite.palette_locked` (padrão `true`
+   mantém o comportamento de sempre). Checkbox "Travar em 30 cores" no
+   editor; `PATCH /api/sprites/{id}/palette-lock`; `locked` opcional em
+   `POST /palette` e em `POST /import-txt`. Import de matriz `.txt` com
+   mais de 30 cores únicas agora pergunta se quer importar destravado em
+   vez de só falhar.
+7. Validado round-trip real (export → import idêntico byte a byte) e
+   dois sprites reais do usuário importados com sucesso: uma espada
+   64×64 e uma tocha/asas 64×64 com 31 cores (destravada).
+8. Instalado Node.js 20 na VPS (não tinha node nem browser) pra rodar
+   testes unitários do JS de referência contra o código real via `vm` —
+   ficou disponível pra testes futuros do frontend.
+9. `docs/AGENT_API.md` atualizado com todos os endpoints novos.
 
 ## O que já está funcionando
 
 ### Backend (FastAPI)
 - Rodando na VPS Hostinger (`89.116.225.87`) via **systemd** (`pixelforge.service`), como root, reinicia sozinho se cair ou se a VPS reiniciar.
 - Nginx como proxy reverso na porta 80 → repassa para `127.0.0.1:8000` (uvicorn não fica exposto direto à internet).
-- Endpoints validados (testado via `TestClient` e via uso real no navegador):
-  - `POST /api/sprites` — cria sprite vazio
+- Endpoints validados (testado via `TestClient`, `curl` direto na VPS e via uso real no navegador):
+  - `POST /api/sprites` — cria sprite vazio (aceita `palette_locked`)
   - `GET /api/sprites/{id}` — lê sprite completo
   - `PATCH /api/sprites/{id}/pixel` — edita 1 pixel por coordenada
   - `PATCH /api/sprites/{id}/region` — preenche bloco retangular
-  - `POST /api/sprites/{id}/palette` — atualiza paleta (máx. 30 cores)
+  - `POST /api/sprites/{id}/palette` — atualiza paleta (30 cores por padrão, `locked` opcional)
+  - `PATCH /api/sprites/{id}/palette-lock` — liga/desliga o limite de 30 cores por sprite
+  - `POST /api/sprites/import` — cria sprite a partir de um PNG (quantiza cores)
+  - `POST /api/sprites/import-txt` — cria sprite a partir de uma matriz `.txt` (`locked` opcional)
+  - `GET /api/sprites/{id}/matrix` — matriz `[y][x]` em cor hex ou `0`
+  - `GET /api/sprites/{id}/export.txt` — mesma matriz como arquivo `.txt` pra download
+  - `POST /api/tools/pixel-grid-check` — verificador de divisibilidade pra downscale de imagem
   - `GET /api/sprites/{id}/analyze` — estatísticas estruturadas (cores usadas, bounding box, simetria)
   - `GET /api/sprites/{id}/export.png` — export PNG com transparência real, escala nearest-neighbor (1×/4×/8×/16×) — **confirmado RGBA correto em teste automatizado**
 - Armazenamento simples: 1 arquivo JSON por sprite em `backend/data/sprites/`.
@@ -34,7 +82,7 @@
 - Botão "Analisar sprite" chamando `/analyze`.
 
 ### Limites e validações
-- Paleta: até 30 cores por sprite (validado no backend).
+- Paleta: até 30 cores por sprite por padrão (`palette_locked: true`), destravável por sprite (validado no backend, ver sessão de 19/08).
 - **Dimensão de sprite: até 4096×4096px por lado** (aumentado de 256px nesta sessão — permite importar spritesheets de animação completas do Terraria, ex: folhas 360×224 ou maiores, sem redimensionamento). Validado tanto no frontend (`<input max>`) quanto no backend (Pydantic `Field(le=4096)`).
 
 ## Bugs encontrados e corrigidos (todos resolvidos e validados)
@@ -138,7 +186,12 @@ Fluxo atual:
    ✅ feito em 17/08/2026 — GitHub, VPS e o snapshot local agora batem, incluindo
    undo/redo, toggle de fundo do canvas e atalhos numéricos que só existiam no
    snapshot antes.
-2. Configuração de domínio + HTTPS (certbot), se/quando tiver domínio apontado para `89.116.225.87`.
+2. Configuração de domínio + HTTPS (certbot). Domínio `forgegrid.com.br`
+   já **comprado** (17/08/2026), status "registrando" no registro.br,
+   DNS ainda não aponta pra VPS. Config do Nginx já pronta em
+   `deploy/nginx-forgegrid.conf` (comentário no topo do arquivo tem o
+   passo a passo de ativação) — só falta o DNS propagar e rodar os
+   passos de lá.
 3. **Estudo por categoria (novo foco a partir de 20/08 com o Codex)** — ver `docs/ANIMATION_RULES_BY_CATEGORY.md`: generalizar os padrões já confirmados item a item em regras por categoria (armadura leve vs pesada/detalhada, arma pequena vs grande, lâmina fina vs cabeça larga vs pontas múltiplas). Framework e perguntas em aberto já documentados, faltam mais exemplos de sprite pra confirmar cada hipótese.
 4. Peitoral (torso) e wings (corpo animado) seguem como as peças de maior prioridade ainda não mapeadas — mencionadas desde o início como as mais complexas.
 5. Exemplo do Calamity Mod (set Bloodflare) — pendente, aguardando arquivos enviados pelo usuário (não baixamos assets proprietários diretamente).
@@ -146,3 +199,10 @@ Fluxo atual:
 7. Avaliar se vale formalizar um "modo ícone" vs "modo corpo animado" na criação de sprite (hoje é só um campo livre de largura/altura).
 8. "Animador" — feature futura de duplicar o desenho do capacete para baixo automaticamente seguindo o grid 40×56 observado (mencionado pelo usuário, ainda não iniciado).
 9. Camadas (layers) de verdade além de frames; onion skin para animação (features futuras, não iniciadas).
+10. **Aplicar o downscale de verdade** — o verificador de divisibilidade
+    (`/api/tools/pixel-grid-check`, sessão de 19/08) só analisa e sugere
+    o bloco; falta o endpoint/fluxo que de fato reduz a referência
+    fazendo a média de cada bloco NxN antes de importar.
+11. Node.js 20 foi instalado na VPS nesta sessão só pra rodar um teste
+    unitário pontual — não tinha `node` nem browser headless antes.
+    Ainda não há suite de testes automatizados de frontend formalizada.
