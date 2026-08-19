@@ -114,6 +114,26 @@ def analyze_frame(sprite: Sprite, frame_index: int = 0) -> Dict:
     }
 
 
+def frame_to_matrix(sprite: Sprite, frame_index: int = 0) -> List[List]:
+    """
+    Converte a matriz de índices de paleta de um frame numa matriz [y][x]
+    "achatada" pronta pro consumo de um agente: cada célula é a cor hex
+    (`#RRGGBBAA`, mesmo formato da paleta) do pixel, ou `0` se o pixel
+    for transparente/tiver índice inválido.
+    """
+    frame = sprite.frames[frame_index]
+    matrix: List[List] = []
+    for row in frame.pixels:
+        out_row: List = []
+        for idx in row:
+            if idx is None or idx < 0 or idx >= len(sprite.palette):
+                out_row.append(0)
+            else:
+                out_row.append(sprite.palette[idx])
+        matrix.append(out_row)
+    return matrix
+
+
 def _nearest_color_index(color: Tuple[int, int, int], palette_rgb: List[Tuple[int, int, int]]) -> int:
     best_i, best_dist = 0, None
     for i, (pr, pg, pb) in enumerate(palette_rgb):

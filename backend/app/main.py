@@ -301,6 +301,22 @@ def analyze_sprite(sprite_id: str, frame: int = 0) -> JSONResponse:
     return JSONResponse(png_export.analyze_frame(sprite, frame_index=frame))
 
 
+@app.get("/api/sprites/{sprite_id}/matrix")
+def get_sprite_matrix(sprite_id: str, frame: int = 0) -> JSONResponse:
+    sprite = _get_sprite_or_404(sprite_id)
+    if frame >= len(sprite.frames):
+        raise HTTPException(400, "Frame inexistente")
+    return JSONResponse(
+        {
+            "sprite_id": sprite.id,
+            "frame": frame,
+            "width": sprite.width,
+            "height": sprite.height,
+            "matrix": png_export.frame_to_matrix(sprite, frame_index=frame),
+        }
+    )
+
+
 # ---------------------------------------------------------------------------
 # Frontend estático (editor)
 # ---------------------------------------------------------------------------

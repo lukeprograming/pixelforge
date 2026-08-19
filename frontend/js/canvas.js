@@ -27,13 +27,26 @@ const ReferenceLayer = {
     this.ctx?.clearRect(0, 0, this.el.width, this.el.height);
   },
 
+  // calcula o retângulo de desenho da referência dentro do canvas,
+  // preservando a proporção original (contain-fit: encaixa pelo maior lado,
+  // sem cortar nem distorcer) e centralizando o espaço sobrando
+  _getDrawRect() {
+    const iw = this.img.naturalWidth || this.img.width;
+    const ih = this.img.naturalHeight || this.img.height;
+    const scale = Math.min(this.el.width / iw, this.el.height / ih);
+    const w = iw * scale;
+    const h = ih * scale;
+    return { x: (this.el.width - w) / 2, y: (this.el.height - h) / 2, w, h };
+  },
+
   render() {
     if (!this.ctx) return;
     this.ctx.clearRect(0, 0, this.el.width, this.el.height);
     if (!this.img || !this.visible) return;
+    const { x, y, w, h } = this._getDrawRect();
     this.ctx.globalAlpha = this.opacity;
     this.ctx.imageSmoothingEnabled = false; // mantém a estética pixel art ao escalar
-    this.ctx.drawImage(this.img, 0, 0, this.el.width, this.el.height);
+    this.ctx.drawImage(this.img, x, y, w, h);
     this.ctx.globalAlpha = 1;
   },
 
@@ -45,13 +58,15 @@ const ReferenceLayer = {
     const py = Math.min(this.el.height - 1, Math.floor(gridY * zoom + zoom / 2));
     try {
       // lê o pixel com opacidade total (ignora o globalAlpha usado no render
-      // visual), redesenhando num buffer temporário só pra leitura exata
+      // visual), redesenhando num buffer temporário só pra leitura exata,
+      // usando o mesmo retângulo proporcional exibido na tela
+      const { x, y, w, h } = this._getDrawRect();
       const tmp = document.createElement("canvas");
       tmp.width = this.el.width;
       tmp.height = this.el.height;
       const tctx = tmp.getContext("2d");
       tctx.imageSmoothingEnabled = false;
-      tctx.drawImage(this.img, 0, 0, tmp.width, tmp.height);
+      tctx.drawImage(this.img, x, y, w, h);
       const data = tctx.getImageData(px, py, 1, 1).data;
       if (data[3] === 0) return null; // transparente, nada pra capturar
       return rgbaToHex(data[0], data[1], data[2], data[3]);

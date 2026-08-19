@@ -113,6 +113,27 @@ Use isso para comparar um sprite em progresso contra o padrão
 esperado (ex: "sprites de armadura do Terraria costumam ser
 simétricos no eixo horizontal e ocupar ~50-60% do canvas").
 
+### Ler matriz de cores (X/Y, hex ou 0)
+```
+GET /api/sprites/{id}/matrix?frame=0
+```
+Retorna a mesma matriz `[y][x]` do frame, mas já resolvida pra cor: cada
+célula é a cor hex da paleta (`#RRGGBBAA`) onde há pixel pintado, ou `0`
+onde está transparente (inclui índice inválido). Útil quando o agente
+quer a cor direto, sem precisar cruzar `pixels` com `palette` na mão.
+```json
+{
+  "sprite_id": "armor_test_01",
+  "frame": 0,
+  "width": 4,
+  "height": 2,
+  "matrix": [
+    ["#1a1a1aff", "#1a1a1aff", 0, 0],
+    [0, "#e8d9b0ff", "#e8d9b0ff", 0]
+  ]
+}
+```
+
 ### Exportar PNG
 ```
 GET /api/sprites/{id}/export.png?frame=0&scale=8
