@@ -143,12 +143,32 @@ def _normalize_cell_hex(cell: str) -> str:
     return f"#{body.lower()}"
 
 
+def _pad_to_square(pixels: List[List[int]], width: int, height: int) -> Tuple[List[List[int]], int]:
+    """
+    Se a matriz não for quadrada, centraliza ela num canvas side x side
+    (side = maior lado), preenchendo a sobra com -1 (transparente).
+    """
+    side = max(width, height)
+    if side == width and side == height:
+        return pixels, side
+
+    pad_x = (side - width) // 2
+    pad_y = (side - height) // 2
+    padded = [[-1] * side for _ in range(side)]
+    for y, row in enumerate(pixels):
+        for x, v in enumerate(row):
+            padded[y + pad_y][x + pad_x] = v
+    return padded, side
+
+
 def sprite_from_matrix_txt(sprite_id: str, text: str, max_palette: int = MAX_PALETTE_COLORS) -> Sprite:
     """
     Caminho inverso do /export.txt: recebe o mesmo formato (uma linha por
     linha Y do frame, células separadas por vírgula -- cor hex "#RRGGBB"
     ou "#RRGGBBAA", ou "0" pra transparente) e monta um Sprite editável,
     com a paleta deduzida das cores únicas usadas (na ordem em que aparecem).
+    Se a matriz não vier quadrada (ex: 60x40), ela é auto-ajustada pro
+    maior lado (60x60), centralizada, com o restante transparente.
     """
     lines = text.replace("\r\n", "\n").replace("\r", "\n").strip("\n").split("\n")
     if not lines or all(not ln.strip() for ln in lines):
@@ -192,10 +212,12 @@ def sprite_from_matrix_txt(sprite_id: str, text: str, max_palette: int = MAX_PAL
             out_row.append(idx)
         pixels.append(out_row)
 
+    pixels, side = _pad_to_square(pixels, width, height)
+
     return Sprite(
         id=sprite_id,
-        width=width,
-        height=height,
+        width=side,
+        height=side,
         palette=palette,
         frames=[Frame(name="frame_0", pixels=pixels)],
     )

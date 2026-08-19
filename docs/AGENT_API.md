@@ -163,10 +163,15 @@ Caminho inverso do `/export.txt`: recebe um `.txt` no mesmo formato
 `#RRGGBB`/`#RRGGBBAA` ou `0` pra transparente) e cria um sprite novo na
 hora — largura/altura vêm do tamanho da matriz, e a paleta é deduzida
 automaticamente das cores únicas usadas (na ordem em que aparecem).
-`400` se `id` já existir, se as linhas tiverem tamanhos diferentes, se
-alguma célula não for `0`/hex válido, ou se a matriz usar mais de 30
-cores únicas (limite de paleta). No editor, o botão "Importar Matriz
-(.txt)" na Galeria faz o mesmo upload.
+
+**Auto-ajuste pro quadrado:** se a matriz não vier quadrada (ex: 60
+colunas × 40 linhas), o sprite final vira `max(largura, altura)` dos
+dois lados (60×60 no exemplo), com a arte original **centralizada** e
+o restante preenchido com `0`/transparente. `409` se `id` já existir;
+`400` se as linhas tiverem tamanhos diferentes entre si, se alguma
+célula não for `0`/hex válido, ou se a matriz usar mais de 30 cores
+únicas (limite de paleta). No editor, o botão "Importar Matriz (.txt)"
+na Galeria faz o mesmo upload.
 
 ### Exportar PNG
 ```
