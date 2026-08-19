@@ -14,7 +14,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, model_validator
 
 MAX_PALETTE_COLORS = 30
 
@@ -36,6 +36,11 @@ class Sprite(BaseModel):
     width: int = Field(gt=0, le=4096)
     height: int = Field(gt=0, le=4096)
     palette: List[str] = Field(default_factory=list)  # hex "#RRGGBBAA"
+    # se True (padrão), a paleta não pode passar de MAX_PALETTE_COLORS --
+    # essa é a identidade do projeto (pixel art de paleta limitada). Pode ser
+    # destravado por sprite (checkbox "Travar em 30 cores" no editor) pra
+    # importar referências com mais cores únicas sem re-quantizar.
+    palette_locked: bool = True
     frames: List[Frame]
     tags: List[str] = Field(default_factory=list)
     # "static" = sprite normal (1 frame, modo Desenho); "animated" = sprite
@@ -45,12 +50,11 @@ class Sprite(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    @field_validator("palette")
-    @classmethod
-    def limit_palette(cls, v: List[str]) -> List[str]:
-        if len(v) > MAX_PALETTE_COLORS:
+    @model_validator(mode="after")
+    def check_palette_limit(self) -> "Sprite":
+        if self.palette_locked and len(self.palette) > MAX_PALETTE_COLORS:
             raise ValueError(f"Paleta excede o limite de {MAX_PALETTE_COLORS} cores")
-        return v
+        return self
 
 
 class SpriteSummary(BaseModel):
@@ -72,6 +76,7 @@ class SpriteCreate(BaseModel):
     width: int = Field(gt=0, le=4096)
     height: int = Field(gt=0, le=4096)
     palette: Optional[List[str]] = None
+    palette_locked: bool = True
 
 
 class PixelEdit(BaseModel):
@@ -92,17 +97,17 @@ class RegionEdit(BaseModel):
 
 class PaletteUpdate(BaseModel):
     palette: List[str]
-
-    @field_validator("palette")
-    @classmethod
-    def limit_palette(cls, v: List[str]) -> List[str]:
-        if len(v) > MAX_PALETTE_COLORS:
-            raise ValueError(f"Paleta excede o limite de {MAX_PALETTE_COLORS} cores")
-        return v
+    # None = mantém o palette_locked atual do sprite; só sobrescreve se vier
+    # explícito (ex: checkbox "Travar em 30 cores" mudou junto com a paleta)
+    locked: Optional[bool] = None
 
 
 class PaletteColorDelete(BaseModel):
     index: int
+
+
+class PaletteLockUpdate(BaseModel):
+    locked: bool
 
 
 class ExportToAnimated(BaseModel):

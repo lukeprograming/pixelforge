@@ -239,6 +239,7 @@ function applySprite(sprite) {
   document.getElementById("sprite-id").value = sprite.id;
   document.getElementById("sprite-w").value = sprite.width;
   document.getElementById("sprite-h").value = sprite.height;
+  PaletteManager.setLimitLocked(sprite.palette_locked !== false);
   if (sprite.kind === "animated") enterAnimatedMode(sprite);
   else enterDrawMode(sprite);
 }
@@ -527,11 +528,25 @@ const Gallery = {
     const id = prompt("Id para o novo sprite:", suggested);
     if (!id) return;
     try {
-      const sprite = await Api.importSpriteTxt(id, file);
+      let sprite;
+      try {
+        sprite = await Api.importSpriteTxt(id, file, true);
+      } catch (err) {
+        // matriz com mais de 30 cores únicas: oferece importar destravado
+        // em vez de simplesmente falhar (a trava pode ser reativada depois)
+        if (!err.message.includes("cores únicas")) throw err;
+        const unlock = confirm(
+          `${err.message}\n\nImportar mesmo assim, sem travar a paleta em 30 cores? ` +
+          `(dá pra travar de novo depois, reduzindo as cores)`
+        );
+        if (!unlock) return;
+        sprite = await Api.importSpriteTxt(id, file, false);
+      }
       await this.refresh();
       loadSprite(sprite.id);
       alert(
-        `Sprite "${sprite.id}" importado: ${sprite.width}×${sprite.height}px, ${sprite.palette.length} cores na paleta.`
+        `Sprite "${sprite.id}" importado: ${sprite.width}×${sprite.height}px, ${sprite.palette.length} cores na paleta` +
+        (sprite.palette_locked === false ? " (sem trava de 30 cores)." : ".")
       );
       this.close();
     } catch (err) {
@@ -626,7 +641,7 @@ async function extractOutlineFromReference() {
 
   let blackIndex = PaletteManager.colors.findIndex((c) => c.toLowerCase() === "#000000ff");
   if (blackIndex < 0) {
-    if (PaletteManager.colors.length >= MAX_PALETTE_COLORS) {
+    if (PaletteManager.limitLocked && PaletteManager.colors.length >= MAX_PALETTE_COLORS) {
       return alert(`Paleta cheia (${MAX_PALETTE_COLORS}/${MAX_PALETTE_COLORS}) e sem preto disponível pro contorno. Exclua uma cor e tente de novo.`);
     }
     PaletteManager.addColor("#000000");
@@ -889,6 +904,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("btn-delete-color").addEventListener("click", deleteSelectedColor);
 
+  document.getElementById("palette-limit-lock").addEventListener("change", async (e) => {
+    const locked = e.target.checked;
+    if (locked && PaletteManager.colors.length > MAX_PALETTE_COLORS) {
+      alert(
+        `A paleta atual tem ${PaletteManager.colors.length} cores. Reduza para ${MAX_PALETTE_COLORS} antes de travar.`
+      );
+      e.target.checked = false;
+      return;
+    }
+    PaletteManager.limitLocked = locked;
+    PaletteManager.render();
+    if (AppState.spriteId) {
+      try {
+        await Api.setPaletteLock(AppState.spriteId, locked);
+      } catch (err) {
+        alert("Erro ao atualizar trava da paleta: " + err.message);
+        e.target.checked = !locked;
+        PaletteManager.limitLocked = !locked;
+        PaletteManager.render();
+      }
+    }
+  });
+
   PaletteManager.isLocked = (i) => AppState.lockedColors.has(i);
 
   PaletteManager.onChange = async (colors) => {
@@ -904,7 +942,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (AppState.spriteId) {
       try {
-        await Api.updatePalette(AppState.spriteId, colors);
+        await Api.updatePalette(AppState.spriteId, colors, PaletteManager.limitLocked);
       } catch (err) {
         console.error("Falha ao salvar paleta:", err);
       }

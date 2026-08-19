@@ -22,11 +22,13 @@ from fastapi.staticfiles import StaticFiles
 
 from . import png_export, storage
 from .models import (
+    MAX_PALETTE_COLORS,
     ExportToAnimated,
     Frame,
     FrameDuplicate,
     FrameDuplicateResult,
     PaletteColorDelete,
+    PaletteLockUpdate,
     PaletteUpdate,
     PixelEdit,
     RegionEdit,
@@ -88,7 +90,9 @@ async def import_sprite(id: str = Form(...), file: UploadFile = File(...)) -> Sp
 
 
 @app.post("/api/sprites/import-txt", response_model=Sprite)
-async def import_sprite_txt(id: str = Form(...), file: UploadFile = File(...)) -> Sprite:
+async def import_sprite_txt(
+    id: str = Form(...), file: UploadFile = File(...), locked: bool = Form(True)
+) -> Sprite:
     if storage.load(id) is not None:
         raise HTTPException(409, f"Sprite '{id}' já existe")
 
@@ -99,7 +103,7 @@ async def import_sprite_txt(id: str = Form(...), file: UploadFile = File(...)) -
         raise HTTPException(400, "Arquivo precisa ser texto UTF-8") from exc
 
     try:
-        sprite = png_export.sprite_from_matrix_txt(id, text)
+        sprite = png_export.sprite_from_matrix_txt(id, text, enforce_limit=locked)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 
@@ -130,6 +134,7 @@ def create_sprite(payload: SpriteCreate) -> Sprite:
         width=payload.width,
         height=payload.height,
         palette=payload.palette or [],
+        palette_locked=payload.palette_locked,
         frames=[Frame(name="frame_0", pixels=pixels)],
     )
     storage.save(sprite)
@@ -204,7 +209,24 @@ def set_region(sprite_id: str, edit: RegionEdit) -> Sprite:
 @app.post("/api/sprites/{sprite_id}/palette", response_model=Sprite)
 def update_palette(sprite_id: str, payload: PaletteUpdate) -> Sprite:
     sprite = _get_sprite_or_404(sprite_id)
+    locked = payload.locked if payload.locked is not None else sprite.palette_locked
+    if locked and len(payload.palette) > MAX_PALETTE_COLORS:
+        raise HTTPException(400, f"Paleta excede o limite de {MAX_PALETTE_COLORS} cores")
     sprite.palette = payload.palette
+    sprite.palette_locked = locked
+    storage.save(sprite)
+    return sprite
+
+
+@app.patch("/api/sprites/{sprite_id}/palette-lock", response_model=Sprite)
+def set_palette_lock(sprite_id: str, payload: PaletteLockUpdate) -> Sprite:
+    sprite = _get_sprite_or_404(sprite_id)
+    if payload.locked and len(sprite.palette) > MAX_PALETTE_COLORS:
+        raise HTTPException(
+            400,
+            f"Paleta atual tem {len(sprite.palette)} cores; reduza para {MAX_PALETTE_COLORS} antes de travar",
+        )
+    sprite.palette_locked = payload.locked
     storage.save(sprite)
     return sprite
 

@@ -37,10 +37,11 @@ const Api = {
     return res.json();
   },
 
-  async importSpriteTxt(id, file) {
+  async importSpriteTxt(id, file, locked = true) {
     const body = new FormData();
     body.append("id", id);
     body.append("file", file);
+    body.append("locked", locked ? "true" : "false");
     const res = await fetch("/api/sprites/import-txt", { method: "POST", body });
     if (!res.ok) throw new Error(await res.text());
     return res.json();
@@ -56,11 +57,21 @@ const Api = {
     return res.json();
   },
 
-  async updatePalette(id, palette) {
+  async updatePalette(id, palette, locked = null) {
     const res = await fetch(`/api/sprites/${encodeURIComponent(id)}/palette`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ palette }),
+      body: JSON.stringify({ palette, locked }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  async setPaletteLock(id, locked) {
+    const res = await fetch(`/api/sprites/${encodeURIComponent(id)}/palette-lock`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ locked }),
     });
     if (!res.ok) throw new Error(await res.text());
     return res.json();

@@ -18,9 +18,18 @@ const PaletteManager = {
   selectedIndex: -1, // -1 = transparente/borracha
   onChange: null, // callback(colors)
   isLocked: null, // callback(index) => bool, injetado pelo app.js (estado da ferramenta de máscara)
+  limitLocked: true, // trava de 30 cores (diferente de isLocked -- essa é sobre a paleta como um todo)
+
+  // liga/desliga a trava de 30 cores e reflete no checkbox + contador
+  setLimitLocked(locked) {
+    this.limitLocked = locked;
+    const checkbox = document.getElementById("palette-limit-lock");
+    if (checkbox) checkbox.checked = locked;
+    this.render();
+  },
 
   setColors(colors) {
-    this.colors = colors.slice(0, MAX_PALETTE_COLORS);
+    this.colors = this.limitLocked ? colors.slice(0, MAX_PALETTE_COLORS) : colors.slice();
     if (this.selectedIndex >= this.colors.length) this.selectedIndex = this.colors.length - 1;
     // se nada estava selecionado ainda, seleciona a primeira cor por padrão
     // (evita o lápis "desenhar" com índice -1 = transparente sem o usuário perceber)
@@ -29,8 +38,8 @@ const PaletteManager = {
   },
 
   addColor(hex) {
-    if (this.colors.length >= MAX_PALETTE_COLORS) {
-      alert(`Limite de ${MAX_PALETTE_COLORS} cores atingido.`);
+    if (this.limitLocked && this.colors.length >= MAX_PALETTE_COLORS) {
+      alert(`Limite de ${MAX_PALETTE_COLORS} cores atingido. Destrave em "Travar em 30 cores" pra adicionar mais.`);
       return;
     }
     // color input HTML só dá RGB; força alpha ff
@@ -62,7 +71,7 @@ const PaletteManager = {
       this.select(existingIndex);
       return existingIndex;
     }
-    if (this.colors.length >= MAX_PALETTE_COLORS) {
+    if (this.limitLocked && this.colors.length >= MAX_PALETTE_COLORS) {
       alert(`Limite de ${MAX_PALETTE_COLORS} cores atingido — não foi possível capturar a cor.`);
       return -1;
     }
@@ -76,7 +85,9 @@ const PaletteManager = {
   render() {
     const grid = document.getElementById("palette-grid");
     const count = document.getElementById("palette-count");
-    count.textContent = `(${this.colors.length}/${MAX_PALETTE_COLORS})`;
+    count.textContent = this.limitLocked
+      ? `(${this.colors.length}/${MAX_PALETTE_COLORS})`
+      : `(${this.colors.length}, sem limite)`;
     grid.innerHTML = "";
 
     this.colors.forEach((hex, i) => {

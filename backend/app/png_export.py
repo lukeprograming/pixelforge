@@ -162,7 +162,12 @@ def _pad_to_square(pixels: List[List[int]], width: int, height: int) -> Tuple[Li
     return padded, side
 
 
-def sprite_from_matrix_txt(sprite_id: str, text: str, max_palette: int = MAX_PALETTE_COLORS) -> Sprite:
+def sprite_from_matrix_txt(
+    sprite_id: str,
+    text: str,
+    max_palette: int = MAX_PALETTE_COLORS,
+    enforce_limit: bool = True,
+) -> Sprite:
     """
     Caminho inverso do /export.txt: recebe o mesmo formato (uma linha por
     linha Y do frame, células separadas por vírgula -- cor hex "#RRGGBB"
@@ -170,6 +175,10 @@ def sprite_from_matrix_txt(sprite_id: str, text: str, max_palette: int = MAX_PAL
     com a paleta deduzida das cores únicas usadas (na ordem em que aparecem).
     Se a matriz não vier quadrada (ex: 60x40), ela é auto-ajustada pro
     maior lado (60x60), centralizada, com o restante transparente.
+
+    enforce_limit=False permite mais de max_palette cores únicas (sprite
+    nasce com palette_locked=False) -- útil pra importar referências ricas
+    em cor sem re-quantizar; o usuário pode travar depois no editor.
     """
     lines = text.replace("\r\n", "\n").replace("\r", "\n").strip("\n").split("\n")
     if not lines or all(not ln.strip() for ln in lines):
@@ -205,7 +214,7 @@ def sprite_from_matrix_txt(sprite_id: str, text: str, max_palette: int = MAX_PAL
             hex_color = _normalize_cell_hex(cell)
             idx = color_to_index.get(hex_color)
             if idx is None:
-                if len(palette) >= max_palette:
+                if enforce_limit and len(palette) >= max_palette:
                     raise ValueError(f"Matriz usa mais de {max_palette} cores únicas (limite da paleta)")
                 idx = len(palette)
                 palette.append(hex_color)
@@ -220,6 +229,7 @@ def sprite_from_matrix_txt(sprite_id: str, text: str, max_palette: int = MAX_PAL
         width=side,
         height=side,
         palette=palette,
+        palette_locked=enforce_limit,
         frames=[Frame(name="frame_0", pixels=pixels)],
     )
 

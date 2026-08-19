@@ -12,8 +12,11 @@ Base URL local: `http://localhost:8000`
   esquerdo, eixo Y cresce para baixo. Cada célula é um número inteiro:
   o **índice da paleta** (`0..N-1`) ou `-1` para transparente.
 - **Paleta**: lista de cores em hex `#RRGGBBAA`, limite de **30 cores**
-  por sprite. A cor de um pixel nunca é armazenada solta — sempre via
-  índice. Isso é o que garante o limite de cores do projeto.
+  por sprite **por padrão**. A cor de um pixel nunca é armazenada solta —
+  sempre via índice. Cada sprite tem um campo `palette_locked` (padrão
+  `true`) que aplica esse limite; com `palette_locked: false` a paleta
+  aceita quantas cores forem necessárias (ver seção "Travar/destravar
+  limite de 30 cores" abaixo).
 - **Frame**: um sprite tem 1+ frames (para animação). A maioria das
   operações aceita `frame` (padrão `0`).
 - **1 pixel do array = 1 pixel do PNG exportado.** Não existe upscale
@@ -44,7 +47,8 @@ POST /api/sprites
   "id": "armor_test_01",
   "width": 40,
   "height": 40,
-  "palette": ["#1a1a1aff", "#e8d9b0ff"]   // opcional, pode ser [] e setar depois
+  "palette": ["#1a1a1aff", "#e8d9b0ff"],   // opcional, pode ser [] e setar depois
+  "palette_locked": true                    // opcional, padrão true (ver seção de paleta)
 }
 ```
 Retorna o `Sprite` completo, com um `frame_0` todo transparente
@@ -75,11 +79,25 @@ mesma cor. Útil para bases sólidas antes de refinar pixel a pixel.
 ### Atualizar paleta
 ```
 POST /api/sprites/{id}/palette
-{ "palette": ["#000000ff", "#ffffffff", "#ff2244ff"] }
+{ "palette": ["#000000ff", "#ffffffff", "#ff2244ff"], "locked": true }
 ```
-Máximo 30 cores. Trocar a paleta não altera os índices já pintados —
+`locked` é opcional — omitido, mantém o `palette_locked` atual do
+sprite; se vier, sobrescreve. Com o sprite travado (`locked: true` ou
+omitido num sprite já travado), a paleta não pode passar de 30 cores
+(`400` se passar). Trocar a paleta não altera os índices já pintados —
 se um índice antigo deixar de existir, o pixel correspondente vira
 "índice inválido" e é tratado como transparente no export.
+
+### Travar/destravar limite de 30 cores
+```
+PATCH /api/sprites/{id}/palette-lock
+{ "locked": false }
+```
+Liga/desliga o `palette_locked` do sprite sem mexer na paleta em si.
+`400` ao tentar travar (`locked: true`) um sprite cuja paleta já tem
+mais de 30 cores — reduza a paleta primeiro (via `/palette`) ou deixe
+destravado. No editor, o checkbox "Travar em 30 cores" ao lado da
+paleta faz o mesmo toggle.
 
 ### Ler um frame específico
 ```
@@ -157,6 +175,7 @@ POST /api/sprites/import-txt
 Content-Type: multipart/form-data
   id: novo_sprite_id
   file: matriz.txt
+  locked: true   // opcional, padrão true
 ```
 Caminho inverso do `/export.txt`: recebe um `.txt` no mesmo formato
 (uma linha por linha Y, células separadas por vírgula, cor hex
@@ -168,10 +187,16 @@ automaticamente das cores únicas usadas (na ordem em que aparecem).
 colunas × 40 linhas), o sprite final vira `max(largura, altura)` dos
 dois lados (60×60 no exemplo), com a arte original **centralizada** e
 o restante preenchido com `0`/transparente. `409` se `id` já existir;
-`400` se as linhas tiverem tamanhos diferentes entre si, se alguma
-célula não for `0`/hex válido, ou se a matriz usar mais de 30 cores
-únicas (limite de paleta). No editor, o botão "Importar Matriz (.txt)"
-na Galeria faz o mesmo upload.
+`400` se as linhas tiverem tamanhos diferentes entre si ou se alguma
+célula não for `0`/hex válido.
+
+**Mais de 30 cores únicas:** com `locked: true` (padrão), uma matriz
+com mais de 30 cores únicas dá `400`. Mande `locked: false` pra
+importar mesmo assim — o sprite nasce com `palette_locked: false` (sem
+limite), e dá pra travar depois via `/palette-lock` (só funciona se a
+paleta já tiver ≤30 cores nesse momento). No editor, o botão "Importar
+Matriz (.txt)" na Galeria detecta esse erro e pergunta se quer importar
+destravado.
 
 ### Verificar divisibilidade pra downscale de referência
 ```
