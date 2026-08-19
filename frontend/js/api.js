@@ -57,6 +57,16 @@ const Api = {
     return res.json();
   },
 
+  async setRegion(id, x0, y0, x1, y1, paletteIndex, frame = 0) {
+    const res = await fetch(`/api/sprites/${encodeURIComponent(id)}/region`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ x0, y0, x1, y1, palette_index: paletteIndex, frame }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
   async updatePalette(id, palette, locked = null) {
     const res = await fetch(`/api/sprites/${encodeURIComponent(id)}/palette`, {
       method: "POST",

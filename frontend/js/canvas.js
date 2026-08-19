@@ -223,6 +223,15 @@ const SpriteCanvas = {
   _dragStart: null,
   _lockAxis: null, // null | 'h' (trava Y, anda em X) | 'v' (trava X, anda em Y)
 
+  // pan (arrastar a área de desenho): botão do meio do mouse funciona sempre,
+  // independente da ferramenta ativa; a ferramenta "Mover" (isPanTool) faz o
+  // botão esquerdo se comportar como o meio, útil sem rodinha/clique-meio
+  isPanTool: false,
+  _panActive: false,
+  _panStart: null, // { x, y, scrollLeft, scrollTop }
+  wrapEl: null,
+  viewportEl: null, // container com scroll (.canvas-area)
+
   el: null,
   checkerEl: null,
   ctx: null,
@@ -236,13 +245,28 @@ const SpriteCanvas = {
     this.checkerEl = document.getElementById("checker");
     this.ctx = this.el.getContext("2d");
     this.checkerCtx = this.checkerEl.getContext("2d");
+    this.wrapEl = document.getElementById("canvas-wrap");
+    this.viewportEl = document.querySelector(".canvas-area");
     ReferenceLayer.init();
     GridOverlay.init();
     LockOverlay.init();
 
-    this.el.addEventListener("mousedown", (e) => this._handlePointer(e, true));
-    this.el.addEventListener("mousemove", (e) => this._handlePointer(e, false));
-    this.el.addEventListener("mouseleave", () => this.onHover?.(null));
+    this.el.addEventListener("mousedown", (e) => this._onMouseDown(e));
+    this.el.addEventListener("mousemove", (e) => this._onMouseMove(e));
+    this.el.addEventListener("mouseleave", () => {
+      if (!this._panActive) this.onHover?.(null);
+    });
+
+    // botão do meio: em vários navegadores/SOs ele abre "autoscroll" (ícone
+    // redondo) ou cola a seleção primária (Linux) -- barra os dois, já que
+    // o preventDefault do mousedown (em _onMouseDown) cobre o autoscroll,
+    // mas o auxclick ainda dispara depois em alguns navegadores
+    this.el.addEventListener("auxclick", (e) => {
+      if (e.button === 1) e.preventDefault();
+    });
+
+    window.addEventListener("mousemove", (e) => this._panMove(e));
+    window.addEventListener("mouseup", (e) => this._panEnd(e));
 
     // solta a trava de eixo ao soltar o botão, mesmo fora do canvas
     const releaseDrag = () => {
@@ -251,6 +275,54 @@ const SpriteCanvas = {
     };
     this.el.addEventListener("mouseup", releaseDrag);
     window.addEventListener("mouseup", releaseDrag);
+  },
+
+  // liga/desliga a ferramenta "Mover": enquanto ativa, o botão esquerdo
+  // também arrasta o canvas (não pinta)
+  setPanTool(active) {
+    this.isPanTool = active;
+    this.wrapEl?.classList.toggle("pan-tool", active);
+  },
+
+  _onMouseDown(e) {
+    const isMiddle = e.button === 1;
+    const isPanLeftClick = e.button === 0 && this.isPanTool;
+    if (isMiddle || isPanLeftClick) {
+      e.preventDefault();
+      this._panActive = true;
+      this._panStart = {
+        x: e.clientX,
+        y: e.clientY,
+        scrollLeft: this.viewportEl.scrollLeft,
+        scrollTop: this.viewportEl.scrollTop,
+      };
+      this.wrapEl?.classList.add("panning");
+      return;
+    }
+    if (e.button !== 0) return; // só botão esquerdo pinta/interage
+    this._handlePointer(e, true);
+  },
+
+  _onMouseMove(e) {
+    if (this._panActive) return; // durante o pan não pinta nem faz hover
+    this._handlePointer(e, false);
+  },
+
+  _panMove(e) {
+    if (!this._panActive || !this.viewportEl) return;
+    const dx = e.clientX - this._panStart.x;
+    const dy = e.clientY - this._panStart.y;
+    this.viewportEl.scrollLeft = this._panStart.scrollLeft - dx;
+    this.viewportEl.scrollTop = this._panStart.scrollTop - dy;
+  },
+
+  _panEnd(e) {
+    if (!this._panActive) return;
+    if (e.button === 1 || e.button === 0) {
+      this._panActive = false;
+      this._panStart = null;
+      this.wrapEl?.classList.remove("panning");
+    }
   },
 
   loadSprite(sprite, frameIndex = 0) {

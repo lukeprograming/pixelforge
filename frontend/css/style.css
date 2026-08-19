@@ -158,8 +158,11 @@ input#sprite-w, input#sprite-h { width: 56px; }
 .canvas-area {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  /* "safe" evita o bug clássico de flexbox: sem ele, quando o conteúdo é
+     maior que a área, o centering trava a rolagem e some com as bordas do
+     desenho (impossível ver a arte inteira em sprites grandes) */
+  align-items: safe center;
+  justify-content: safe center;
   gap: 10px;
   overflow: auto;
   background:
@@ -170,6 +173,15 @@ input#sprite-w, input#sprite-h { width: 56px; }
   position: relative;
   box-shadow: 0 0 0 1px var(--line), 0 12px 40px rgba(0,0,0,0.45);
   image-rendering: pixelated;
+  cursor: crosshair;
+}
+
+.canvas-wrap.panning {
+  cursor: grabbing !important;
+}
+
+.canvas-wrap.pan-tool {
+  cursor: grab;
 }
 
 #checker, #reference, #sprite-canvas, #grid, #lock-overlay {

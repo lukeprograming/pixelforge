@@ -123,14 +123,63 @@ async function paintPixel(x, y, meta = {}) {
 
   // lápis / borracha: pincel NxN, com espelho opcional no eixo X
   const idx = AppState.tool === "eraser" ? -1 : PaletteManager.selectedIndex;
-  const cells = brushCoords(x, y, AppState.brushSize);
+  const hasLocks = AppState.lockedColors.size > 0 || AppState.lockedPixels.size > 0;
 
-  for (const [bx, by] of cells) {
-    await commitPixel(bx, by, idx);
-    if (AppState.mirrorX) {
-      const mx = SpriteCanvas.width - 1 - bx;
-      await commitPixel(mx, by, idx);
+  if (hasLocks) {
+    // com a máscara ativa não dá pra mandar o quadrado inteiro de uma vez
+    // (o backend não sabe o que está travado) -- mantém pixel a pixel, mais
+    // lento mas garante que nenhum pixel travado seja sobrescrito
+    const cells = brushCoords(x, y, AppState.brushSize);
+    for (const [bx, by] of cells) {
+      await commitPixel(bx, by, idx);
+      if (AppState.mirrorX) {
+        const mx = SpriteCanvas.width - 1 - bx;
+        await commitPixel(mx, by, idx);
+      }
     }
+    return;
+  }
+
+  await paintBrushRegion(x, y, idx);
+}
+
+// pinta o quadrado inteiro do pincel de uma vez: atualiza a matriz local e
+// redesenha 1x (visual instantâneo), depois persiste com 1-2 chamadas ao
+// endpoint /region (1 por lado, se houver espelho) em vez de N×N chamadas
+// pixel a pixel -- era isso que fazia pincéis grandes "arrastarem" com
+// delay visível, esperando cada pixel confirmar no backend antes do próximo
+async function paintBrushRegion(cx, cy, idx) {
+  const size = AppState.brushSize;
+  const offset = Math.floor((size - 1) / 2);
+  const x0 = Math.max(0, cx - offset);
+  const y0 = Math.max(0, cy - offset);
+  const x1 = Math.min(SpriteCanvas.width - 1, cx - offset + size - 1);
+  const y1 = Math.min(SpriteCanvas.height - 1, cy - offset + size - 1);
+  if (x0 > x1 || y0 > y1) return;
+
+  const regions = [[x0, y0, x1, y1]];
+  if (AppState.mirrorX) {
+    const mx0 = SpriteCanvas.width - 1 - x1;
+    const mx1 = SpriteCanvas.width - 1 - x0;
+    regions.push([mx0, y0, mx1, y1]);
+  }
+
+  for (const [rx0, ry0, rx1, ry1] of regions) {
+    for (let y = ry0; y <= ry1; y++) {
+      for (let x = rx0; x <= rx1; x++) {
+        SpriteCanvas.pixels[y][x] = idx;
+      }
+    }
+  }
+  SpriteCanvas.render();
+
+  const frame = AppState.activeFrameIndex ?? 0;
+  try {
+    await Promise.all(
+      regions.map(([rx0, ry0, rx1, ry1]) => Api.setRegion(AppState.spriteId, rx0, ry0, rx1, ry1, idx, frame))
+    );
+  } catch (err) {
+    console.error("Falha ao salvar região do pincel:", err);
   }
 }
 
@@ -225,6 +274,7 @@ function setActiveTool(tool) {
   document.querySelectorAll(".tool-btn").forEach((b) => {
     b.classList.toggle("active", b.dataset.tool === tool);
   });
+  SpriteCanvas.setPanTool(tool === "pan");
 }
 
 // ---------------------------------------------------------------------------
