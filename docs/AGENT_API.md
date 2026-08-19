@@ -151,6 +151,23 @@ arquivo para o frame ativo. Use o endpoint `/matrix` (JSON) quando for
 consumir o dado programaticamente; use `/export.txt` quando o objetivo
 for gerar um arquivo pra anexar/compartilhar.
 
+### Importar sprite a partir de uma matriz .txt
+```
+POST /api/sprites/import-txt
+Content-Type: multipart/form-data
+  id: novo_sprite_id
+  file: matriz.txt
+```
+Caminho inverso do `/export.txt`: recebe um `.txt` no mesmo formato
+(uma linha por linha Y, células separadas por vírgula, cor hex
+`#RRGGBB`/`#RRGGBBAA` ou `0` pra transparente) e cria um sprite novo na
+hora — largura/altura vêm do tamanho da matriz, e a paleta é deduzida
+automaticamente das cores únicas usadas (na ordem em que aparecem).
+`400` se `id` já existir, se as linhas tiverem tamanhos diferentes, se
+alguma célula não for `0`/hex válido, ou se a matriz usar mais de 30
+cores únicas (limite de paleta). No editor, o botão "Importar Matriz
+(.txt)" na Galeria faz o mesmo upload.
+
 ### Exportar PNG
 ```
 GET /api/sprites/{id}/export.png?frame=0&scale=8

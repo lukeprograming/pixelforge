@@ -87,6 +87,26 @@ async def import_sprite(id: str = Form(...), file: UploadFile = File(...)) -> Sp
     return sprite
 
 
+@app.post("/api/sprites/import-txt", response_model=Sprite)
+async def import_sprite_txt(id: str = Form(...), file: UploadFile = File(...)) -> Sprite:
+    if storage.load(id) is not None:
+        raise HTTPException(409, f"Sprite '{id}' já existe")
+
+    data = await file.read()
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(400, "Arquivo precisa ser texto UTF-8") from exc
+
+    try:
+        sprite = png_export.sprite_from_matrix_txt(id, text)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+    storage.save(sprite)
+    return sprite
+
+
 @app.post("/api/sprites", response_model=Sprite)
 def create_sprite(payload: SpriteCreate) -> Sprite:
     if storage.load(payload.id) is not None:

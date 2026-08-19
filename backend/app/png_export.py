@@ -134,6 +134,73 @@ def frame_to_matrix(sprite: Sprite, frame_index: int = 0) -> List[List]:
     return matrix
 
 
+def _normalize_cell_hex(cell: str) -> str:
+    body = cell[1:]
+    if len(body) == 6:
+        body += "ff"
+    if len(body) != 8 or any(c not in "0123456789abcdefABCDEF" for c in body):
+        raise ValueError(f"Cor hex inválida na matriz: {cell!r}")
+    return f"#{body.lower()}"
+
+
+def sprite_from_matrix_txt(sprite_id: str, text: str, max_palette: int = MAX_PALETTE_COLORS) -> Sprite:
+    """
+    Caminho inverso do /export.txt: recebe o mesmo formato (uma linha por
+    linha Y do frame, células separadas por vírgula -- cor hex "#RRGGBB"
+    ou "#RRGGBBAA", ou "0" pra transparente) e monta um Sprite editável,
+    com a paleta deduzida das cores únicas usadas (na ordem em que aparecem).
+    """
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").strip("\n").split("\n")
+    if not lines or all(not ln.strip() for ln in lines):
+        raise ValueError("Arquivo vazio")
+
+    rows = [ln.split(",") for ln in lines]
+    width = len(rows[0])
+    height = len(rows)
+    if width == 0:
+        raise ValueError("Linha vazia na matriz")
+    for i, row in enumerate(rows):
+        if len(row) != width:
+            raise ValueError(
+                f"Linha {i} tem {len(row)} coluna(s), esperado {width} "
+                "(todas as linhas precisam ter o mesmo número de colunas)"
+            )
+    if width > 4096 or height > 4096:
+        raise ValueError("Matriz excede o limite de 4096px por lado")
+
+    palette: List[str] = []
+    color_to_index: Dict[str, int] = {}
+    pixels: List[List[int]] = []
+
+    for row in rows:
+        out_row: List[int] = []
+        for raw in row:
+            cell = raw.strip()
+            if cell == "" or cell == "0":
+                out_row.append(-1)
+                continue
+            if not cell.startswith("#"):
+                raise ValueError(f"Célula inválida: {cell!r} (esperado hex tipo #RRGGBB[AA] ou 0)")
+            hex_color = _normalize_cell_hex(cell)
+            idx = color_to_index.get(hex_color)
+            if idx is None:
+                if len(palette) >= max_palette:
+                    raise ValueError(f"Matriz usa mais de {max_palette} cores únicas (limite da paleta)")
+                idx = len(palette)
+                palette.append(hex_color)
+                color_to_index[hex_color] = idx
+            out_row.append(idx)
+        pixels.append(out_row)
+
+    return Sprite(
+        id=sprite_id,
+        width=width,
+        height=height,
+        palette=palette,
+        frames=[Frame(name="frame_0", pixels=pixels)],
+    )
+
+
 def _nearest_color_index(color: Tuple[int, int, int], palette_rgb: List[Tuple[int, int, int]]) -> int:
     best_i, best_dist = 0, None
     for i, (pr, pg, pb) in enumerate(palette_rgb):

@@ -521,6 +521,23 @@ const Gallery = {
       alert("Erro ao importar: " + err.message);
     }
   },
+
+  async importTxtFile(file) {
+    const suggested = file.name.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9_-]/g, "_") || "importado";
+    const id = prompt("Id para o novo sprite:", suggested);
+    if (!id) return;
+    try {
+      const sprite = await Api.importSpriteTxt(id, file);
+      await this.refresh();
+      loadSprite(sprite.id);
+      alert(
+        `Sprite "${sprite.id}" importado: ${sprite.width}×${sprite.height}px, ${sprite.palette.length} cores na paleta.`
+      );
+      this.close();
+    } catch (err) {
+      alert("Erro ao importar: " + err.message);
+    }
+  },
 };
 
 function exportPng() {
@@ -659,6 +676,11 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("import-file").addEventListener("change", (e) => {
     const file = e.target.files?.[0];
     if (file) Gallery.importFile(file);
+    e.target.value = "";
+  });
+  document.getElementById("import-file-txt").addEventListener("change", (e) => {
+    const file = e.target.files?.[0];
+    if (file) Gallery.importTxtFile(file);
     e.target.value = "";
   });
 

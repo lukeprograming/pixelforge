@@ -37,6 +37,15 @@ const Api = {
     return res.json();
   },
 
+  async importSpriteTxt(id, file) {
+    const body = new FormData();
+    body.append("id", id);
+    body.append("file", file);
+    const res = await fetch("/api/sprites/import-txt", { method: "POST", body });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
   async setPixel(id, x, y, paletteIndex, frame = 0) {
     const res = await fetch(`/api/sprites/${encodeURIComponent(id)}/pixel`, {
       method: "PATCH",
