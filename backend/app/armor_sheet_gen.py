@@ -125,20 +125,57 @@ def fill_rect(
     dest[y0:y1, x0:x1] = color
 
 
+def content_bbox(template: np.ndarray) -> Tuple[int, int, int, int]:
+    """
+    Bbox (x0, y0, x1, y1) dos pixels com alpha > 0 -- exclusiva no fim
+    (x1/y1 nao fazem parte do conteudo, prontos pra slice). Canvas
+    totalmente transparente devolve o canvas inteiro.
+    """
+    alpha = template[:, :, 3]
+    ys, xs = np.nonzero(alpha > 0)
+    if len(xs) == 0:
+        return 0, 0, template.shape[1], template.shape[0]
+    return int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1
+
+
 def prepare_template(template: np.ndarray, input_scale: int, output_scale: int) -> np.ndarray:
     """
-    Reamostra o template (nearest-neighbor) pra que sua densidade de pixels
-    fique alinhada com output_scale, independente da densidade em que foi
-    fornecido (input_scale). Se ja estiverem alinhadas, retorna sem tocar.
+    Recorta o template pra bbox do conteudo opaco e reamostra (nearest-
+    neighbor) pra que sua densidade de pixels fique alinhada com
+    output_scale, independente da densidade em que foi fornecido
+    (input_scale).
 
-    Isso e o que permite usar tanto o template nativo (128x80, input_scale=1)
-    quanto uma referencia de maior densidade (ex.: 5x) como fonte, mantendo
-    o mesmo copy_rect() de baixo -- ele so sabe operar quando origem e
-    destino estao na mesma densidade.
+    O recorte pela bbox e obrigatorio, nao cosmetico: canvas com padding
+    (ex. gerado por ferramenta de IA que sempre devolve quadrado) faz a
+    largura/altura do canvas nao bater com o conteudo real -- bug real
+    medido com armor_template_v1_ref.png (canvas 512x512, conteudo real
+    512x320, 96px de padding vertical). Sem o recorte, o resize usava as
+    dimensoes erradas (512x512 * 0.5 = 256x256 em vez de 512x320 * 0.5 =
+    256x160) e todo copy_rect() subsequente lia da posicao errada --
+    resultado saia com a silhueta deslocada, nao só "com mais detalhe".
+
+    Levanta erro se o conteudo recortado nao bater exatamente com
+    TEMPLATE_W_1X/H_1X * input_scale -- input_scale errado (ou um canvas
+    com padding em formato nao suportado) tem que falhar alto, nao gerar
+    sheet silenciosamente desalinhado. Use detect_input_scale() pra achar
+    o input_scale certo antes de chamar isto.
     """
+    x0, y0, x1, y1 = content_bbox(template)
+    content = template[y0:y1, x0:x1]
+
+    expected_w = TEMPLATE_W_1X * input_scale
+    expected_h = TEMPLATE_H_1X * input_scale
+    if content.shape[1] != expected_w or content.shape[0] != expected_h:
+        raise ValueError(
+            f"conteudo do template (bbox opaca) e {content.shape[1]}x{content.shape[0]}, "
+            f"mas input_scale={input_scale} esperava {expected_w}x{expected_h} "
+            f"({TEMPLATE_W_1X}x{TEMPLATE_H_1X} * {input_scale}). Confira o input_scale "
+            f"(GET /api/armor/detect-scale) ou o padding do canvas."
+        )
+
     if input_scale == output_scale:
-        return template
-    img = Image.fromarray(template, mode="RGBA")
+        return content
+    img = Image.fromarray(content, mode="RGBA")
     factor = output_scale / input_scale
     new_w = round(img.width * factor)
     new_h = round(img.height * factor)
@@ -528,10 +565,12 @@ def detect_input_scale(
     Retorna um dict com a bbox medida e o scale detectado (None se nao
     bater com nenhum). O chamador decide o que fazer com None -- a UI
     deixa o campo pro usuario escolher manualmente de qualquer jeito.
+
+    Usa o mesmo content_bbox() que prepare_template() usa pra recortar de
+    verdade -- o valor aqui devolvido e o que efetivamente vai ser
+    validado contra input_scale quando o sheet for gerado.
     """
-    alpha = template[:, :, 3]
-    ys, xs = np.nonzero(alpha > 0)
-    if len(xs) == 0:
+    if not np.any(template[:, :, 3] > 0):
         return {
             "canvas_w": int(template.shape[1]),
             "canvas_h": int(template.shape[0]),
@@ -541,8 +580,9 @@ def detect_input_scale(
             "matches": {},
         }
 
-    content_w = int(xs.max() - xs.min() + 1)
-    content_h = int(ys.max() - ys.min() + 1)
+    x0, y0, x1, y1 = content_bbox(template)
+    content_w = x1 - x0
+    content_h = y1 - y0
 
     matches = {}
     detected = None
