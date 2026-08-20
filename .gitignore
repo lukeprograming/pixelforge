@@ -2,6 +2,11 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# Instância local via localhost (run_local.sh) -- processo/log de dev,
+# nao faz parte do produto.
+/local_server.log
+/local_server.pid
 backend/data/sprites/*.json
 backend/data/exports/*.png
 backend/data/armor_exports/

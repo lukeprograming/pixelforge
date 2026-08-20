@@ -1,7 +1,36 @@
 # PixelForge — Status do projeto
 
-Última atualização: 20 de agosto de 2026 (sessão de porte do ArmorHelper
-+ Terraria Sprite Transformer pra Python, aba de GIF de armadura)
+Última atualização: 20 de agosto de 2026 (instância local via localhost +
+launcher .desktop; porte do ArmorHelper + Terraria Sprite Transformer
+pra Python, aba de GIF de armadura)
+
+## Sessão de 20/08/2026 (Claude Code) — instância local
+
+A VPS (`forgegrid.com.br`) continua sendo a instância de produção, sem
+mudança nenhuma. Além dela, agora existe uma instância local que roda
+via `localhost`, pra uso sem depender da VPS:
+
+- `backend/.venv/` — venv local (não versionado). Setup:
+  `cd backend && python3 -m venv .venv && ./.venv/bin/pip install -r requirements.txt`.
+- **Bug real corrigido**: `requirements.txt` não listava `numpy`, apesar
+  de `armor_sheet_gen.py` (sessão anterior) importar direto. Na VPS
+  funcionava porque alguém instalou `numpy` manualmente no venv sem
+  atualizar o arquivo — drift silencioso. Adicionado `numpy>=2.0`.
+- `backend/data/` local foi semeado com uma cópia (`rsync`) dos dados
+  reais da VPS (62 sprites, ~47MB) — cópia única, feita 2026-08-20. Local
+  e VPS **não sincronizam automaticamente** a partir daqui; editar dos
+  dois lados vai divergir os dados (não só o código) se não houver
+  `rsync` manual de novo.
+- `run_local.sh` (raiz do projeto) — sobe o servidor local (se não
+  estiver rodando, checando `/api/sprites/meta`) e abre em janela de app
+  (`--app=` se achar um navegador Chromium; senão `xdg-open`).
+- `assets/pixelforge-icon.png` — ícone gerado (fundo `--bg-0`, marca
+  `--accent`, mesmas cores do frontend).
+- `~/.local/share/applications/pixelforge-local.desktop` (fora do repo,
+  é local da máquina) — launcher de menu apontando pro `run_local.sh`.
+- **Ainda não feito, próximo passo natural**: versão nativa Linux
+  (empacotar como binário/AppImage em vez de venv + navegador). Decisão
+  do usuário: fazer isso depois, não nesta sessão.
 
 ## Sessão de 20/08/2026 (Claude Code)
 
