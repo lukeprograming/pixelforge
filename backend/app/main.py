@@ -13,14 +13,16 @@ Rodar localmente:
 
 from __future__ import annotations
 
+import zipfile
 from pathlib import Path
 from typing import List, Optional
 
+import numpy as np
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import png_export, storage
+from . import armor_sheet_gen, png_export, storage
 from .models import (
     MAX_PALETTE_COLORS,
     ExportToAnimated,
@@ -51,6 +53,9 @@ app = FastAPI(
 )
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+PROJECT_EXPORT_DIR = Path(__file__).resolve().parent.parent / "data" / "project_exports"
+PROJECT_EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # ---------------------------------------------------------------------------
@@ -378,6 +383,88 @@ def export_matrix_txt(sprite_id: str, frame: int = 0) -> PlainTextResponse:
     text = "\n".join(",".join(str(cell) for cell in row) for row in matrix)
     filename = f"{sprite.id}_frame{frame}_matrix.txt"
     return PlainTextResponse(text, headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+# ---------------------------------------------------------------------------
+# Geracao de folhas de armadura (porte do ArmorHelper.exe) + export de GIF
+# ---------------------------------------------------------------------------
+
+ARMOR_EXPORT_DIR = Path(__file__).resolve().parent.parent / "data" / "armor_exports"
+ARMOR_EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@app.get("/api/armor/actions")
+def list_armor_actions() -> List[str]:
+    return sorted(armor_sheet_gen.ACTIONS.keys())
+
+
+@app.get("/api/armor/generate")
+def generate_armor_sheet(
+    sprite_id: str,
+    action: str = "Head",
+    frame: int = 0,
+    input_scale: int = 1,
+    output_scale: int = 2,
+    format: str = "png",
+):
+    if action not in armor_sheet_gen.ACTIONS:
+        raise HTTPException(400, f"Ação inválida. Use uma de: {sorted(armor_sheet_gen.ACTIONS.keys())}")
+    if format not in ("png", "gif"):
+        raise HTTPException(400, "format deve ser 'png' ou 'gif'")
+    if input_scale < 1 or output_scale < 1:
+        raise HTTPException(400, "input_scale e output_scale devem ser >= 1")
+
+    sprite = _get_sprite_or_404(sprite_id)
+    if frame >= len(sprite.frames):
+        raise HTTPException(400, "Frame inexistente")
+
+    template_img = png_export.render_frame_to_image(sprite, frame_index=frame)
+    template = np.array(template_img)
+
+    try:
+        sheet = armor_sheet_gen.ACTIONS[action](template, output_scale, input_scale)
+    except Exception as exc:  # template com dimensões incompatíveis com o layout esperado
+        raise HTTPException(400, f"Falha ao gerar '{action}': {exc}") from exc
+
+    base_name = f"{sprite.id}_{action}_in{input_scale}_out{output_scale}"
+
+    if format == "png":
+        out_path = ARMOR_EXPORT_DIR / f"{base_name}.png"
+        armor_sheet_gen.save_png(sheet, str(out_path))
+        return FileResponse(out_path, media_type="image/png", filename=out_path.name)
+
+    frames = armor_sheet_gen.extract_gif_frames(sheet, output_scale)
+    out_path = ARMOR_EXPORT_DIR / f"{base_name}.gif"
+    try:
+        armor_sheet_gen.save_gif(frames, str(out_path))
+    except ValueError as exc:  # paleta grande demais pra GIF indexado
+        raise HTTPException(400, str(exc)) from exc
+    return FileResponse(out_path, media_type="image/gif", filename=out_path.name)
+
+
+# ---------------------------------------------------------------------------
+# Export do projeto inteiro (.zip) -- pra backup manual / levar pro PC local
+# ---------------------------------------------------------------------------
+
+_PROJECT_ZIP_EXCLUDE_DIRS = {".venv", "__pycache__", "node_modules", "project_exports"}
+_PROJECT_ZIP_EXCLUDE_SUFFIXES = {".pyc"}
+
+
+@app.get("/api/project/export.zip")
+def export_project_zip():
+    out_path = PROJECT_EXPORT_DIR / "pixelforge_project.zip"
+    with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+        for path in PROJECT_ROOT.rglob("*"):
+            if path.is_dir():
+                continue
+            if any(part in _PROJECT_ZIP_EXCLUDE_DIRS for part in path.parts):
+                continue
+            if path.suffix in _PROJECT_ZIP_EXCLUDE_SUFFIXES:
+                continue
+            rel = path.relative_to(PROJECT_ROOT)
+            zf.write(path, arcname=str(Path("pixelforge") / rel))
+
+    return FileResponse(out_path, media_type="application/zip", filename="pixelforge_project.zip")
 
 
 # ---------------------------------------------------------------------------

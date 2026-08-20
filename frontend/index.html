@@ -23,6 +23,8 @@
         <button id="btn-load" class="btn">Abrir</button>
         <button id="btn-save" class="btn btn-primary">Salvar</button>
         <button id="btn-gallery" class="btn">🖼️ Galeria</button>
+        <button id="btn-armor-gif" class="btn">🛡️ GIF Armadura</button>
+        <a id="btn-export-project" class="btn" href="/api/project/export.zip" download="pixelforge_project.zip" title="Baixa um .zip com o estado atual de todo o projeto (código + dados), exceto .venv">⬇️ Projeto (.zip)</a>
       </div>
 
       <div class="export-controls">
@@ -201,6 +203,48 @@
         Nenhum sprite salvo ainda. Crie um novo ou importe um PNG.
       </div>
       <div id="gallery-grid" class="gallery-grid"></div>
+    </div>
+  </div>
+
+  <div id="armor-gif-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Gerador de folha/GIF de armadura (porte do ArmorHelper)</h2>
+        <div class="modal-header-actions">
+          <button id="btn-armor-gif-close" class="btn" title="Fechar">✕</button>
+        </div>
+      </div>
+      <div class="armor-gif-form">
+        <label>
+          Template de origem
+          <select id="armor-sprite-select"></select>
+        </label>
+        <label>
+          Ação
+          <select id="armor-action-select"></select>
+        </label>
+        <label>
+          Densidade do template (input_scale)
+          <input id="armor-input-scale" type="number" min="1" value="1" />
+        </label>
+        <label>
+          Densidade da saída (output_scale)
+          <input id="armor-output-scale" type="number" min="1" value="2" />
+        </label>
+        <label>
+          Formato
+          <select id="armor-format-select">
+            <option value="png">PNG (folha estática)</option>
+            <option value="gif" selected>GIF (animado, 52 frames)</option>
+          </select>
+        </label>
+        <button id="btn-armor-generate" class="btn btn-accent">Gerar</button>
+      </div>
+      <div id="armor-gif-result" class="armor-gif-result hidden">
+        <img id="armor-gif-preview" alt="preview" />
+        <a id="armor-gif-download" class="btn btn-primary" download>⬇️ Baixar</a>
+      </div>
+      <div id="armor-gif-error" class="armor-gif-error hidden"></div>
     </div>
   </div>
 

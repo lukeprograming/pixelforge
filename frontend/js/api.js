@@ -127,6 +127,23 @@ const Api = {
     return `/api/sprites/${encodeURIComponent(id)}/export.png?frame=${frame}&scale=${scale}`;
   },
 
+  async armorActions() {
+    const res = await fetch("/api/armor/actions");
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  armorGenerateUrl(spriteId, action, inputScale, outputScale, format) {
+    const params = new URLSearchParams({
+      sprite_id: spriteId,
+      action,
+      input_scale: inputScale,
+      output_scale: outputScale,
+      format,
+    });
+    return `/api/armor/generate?${params.toString()}`;
+  },
+
   exportMatrixTxtUrl(id, frame = 0) {
     return `/api/sprites/${encodeURIComponent(id)}/export.txt?frame=${frame}`;
   },

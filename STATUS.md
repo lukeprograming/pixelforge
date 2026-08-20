@@ -1,7 +1,105 @@
 # PixelForge — Status do projeto
 
-Última atualização: 19 de agosto de 2026 (sessão de export/import de
-matriz, verificador de downscale e paleta destravável)
+Última atualização: 20 de agosto de 2026 (sessão de porte do ArmorHelper
++ Terraria Sprite Transformer pra Python, aba de GIF de armadura)
+
+## Sessão de 20/08/2026 (Claude Code)
+
+Foco da sessão: transformar duas ferramentas de terceiros usadas no
+pipeline de armadura do usuário (`ArmorHelper.exe` e `Terraria Sprite
+Transformer.jar`, ambas binários compilados, sem código-fonte, sem CLI)
+em código Python nativo dentro do próprio PixelForge — decidido depois de
+avaliar chamar os binários originais direto (Mono/Xvfb/libgdiplus seria
+frágil, GUI-only, sem parâmetro de escala) vs. reimplementar. Nada disso
+depende mais dos arquivos `.exe`/`.jar` originais em produção.
+
+1. **Fix 413 (nginx)** — `client_max_body_size` faltava (default 1MB) em
+   `pixelforge` e `forgegrid` (`/etc/nginx/sites-available/`). Adicionado
+   `50m` nos dois, `200m` na área de dev-upload. Validado via HTTPS real
+   contra `forgegrid.com.br`.
+
+2. **Área de dev-upload descartável** (`dev_upload_server.py`, porta 8899,
+   proxy em `/dev-upload/` no nginx) — canal sem autenticação só pra subir
+   binários grandes (`.jar`, `.zip`) da VPS de 30 dias, que não será
+   renovada. **Regra permanente:** a UI (`/dev-upload/ui`) fica
+   **desativada (404) por padrão**, só liga quando pedido explicitamente
+   pra subir algo específico; a API (`/upload`) pode ficar sempre ativa
+   pra chamada de agentes. Não faz parte do app principal.
+
+3. **`backend/app/armor_sheet_gen.py`** (novo) — porte completo, em
+   Python + numpy/Pillow, da lógica do `ArmorHelper.exe` decompilado
+   (ilspycmd), sem chamar o binário:
+   - Ações portadas e **validadas pixel-a-pixel (0% de diferença)**
+     contra saídas reais do `.exe` que o usuário rodou localmente e subiu
+     como referência: **Head, Body, Female, Legs, Arms**.
+   - **Full Armor** (`FullArmor`/`FullArmorFemale`) — composição na
+     mesma ordem do original (Legs → Body/Female → Head → frontArm),
+     testada e funcionando; sem JSON de referência dedicado pra diff
+     automático, mas construída só com peças já validadas.
+   - **Diferença de arquitetura em relação ao original:** `input_scale`
+     (densidade do template de entrada) e `output_scale` (densidade da
+     folha de saída) são parâmetros independentes — o `.exe` original
+     sempre assume template 1x (128×80) fixo e upscale de saída fixo em
+     2x. Com `input_scale=1, output_scale=2` e o template real, o
+     resultado é idêntico ao original; com `input_scale` maior (ex: um
+     template próprio em 4x/5x de densidade) dá pra gerar saída fiel a
+     partir de uma referência de mais qualidade.
+   - **Export de GIF** portado (`extract_gif_frames` + `save_gif`) —
+     replica a sequência exata de 52 frames em 5 grupos do
+     `SaveAsGif()`/`AnimatedGifCreator` original (66ms/frame, loop
+     infinito, paleta indexada com transparência).
+   - **Ainda não portado:** variantes "+ Player" (precisam extrair os
+     bitmaps `PlayerMale`/`PlayerFemale`/`PlayerEyes` embutidos como
+     recurso no `.exe`, não feito ainda).
+   - Bug real encontrado e corrigido durante o porte: a leitura do
+     retângulo de origem estava sendo multiplicada por `output_scale`
+     mesmo quando o template já estava na densidade nativa — lia o
+     pedaço errado da imagem. Corrigido isolando `prepare_template()`
+     (reamostragem nearest-neighbor pra alinhar densidades) do
+     `copy_rect()` (que assume origem e destino já na mesma densidade).
+
+4. **`compose_terraria_sheet()`** (mesmo arquivo) — porte do
+   `Terraria Sprite Transformer v1.jar` (Swing, GUI-only, sem modo
+   headless — mesmo motivo do ArmorHelper pra reimplementar em vez de
+   rodar o binário). É literalmente 32 recortes fixos 1:1 (sem resize)
+   que juntam três folhas 40×1120 (Body/Arm/Female — exatamente a saída
+   das funções acima com `output_scale=2`) num sheet final 360×224, no
+   formato que o tModLoader espera pra preview de equipamento completo.
+   Testado gerando o sheet a partir do `ArmorTemplate_v1.png` real
+   (importado como sprite `armor_template_v1_native`); resultado
+   importado na galeria como `terraria_sheet_fixed_v1` pra comparação
+   visual do usuário contra a referência real (`VictideBreastplate_Body`,
+   360×224, subida por ele) — ainda não há diff automático pixel-a-pixel
+   porque são armaduras diferentes, só o mesmo formato/layout.
+
+5. **`GET /api/armor/actions`** e **`GET /api/armor/generate`** (novo, em
+   `backend/app/main.py`) — expõe o porte do ArmorHelper como API: recebe
+   `sprite_id` (sprite já existente no PixelForge, usado como template de
+   origem via `png_export.render_frame_to_image`), `action` (Head/Body/
+   Female/Legs/Arms/FullArmor/FullArmorFemale), `input_scale`,
+   `output_scale`, `format` (`png` ou `gif`) — devolve o arquivo gerado
+   direto (`FileResponse`), sem precisar rodar nada localmente.
+
+6. **Aba "🛡️ GIF Armadura"** (novo, separada da Galeria) — modal no
+   frontend (`index.html` + `ArmorGifPanel` em `app.js` + CSS em
+   `style.css`) que lista sprites existentes, deixa escolher ação/escala/
+   formato, chama `/api/armor/generate` e mostra preview + botão de
+   download do PNG/GIF resultante.
+
+7. **Botão "Baixar" na Galeria** — ao lado de "Abrir"/"Excluir" em cada
+   card, baixa o PNG direto via `/export.png` (rota leve) sem precisar
+   abrir o sprite no editor. Motivado por um sprite pesado (matriz `.txt`
+   gigante importada sem quantização de paleta) ter derrubado a VPS ao
+   tentar renderizar no canvas completo — ver nota de limpeza abaixo.
+
+8. **Nota de limpeza pendente:** `armor_head_test_scale2.json`
+   (~17MB, em `backend/data/sprites/`) é a versão pesada/com bug do
+   teste inicial de Head, importada pela rota de matriz `.txt` sem
+   quantização — foi o arquivo que derrubou a VPS ao abrir no editor.
+   Já superado pela versão corrigida e leve (`armor_head_fixed_v1.json`,
+   ~645KB, importada via `/api/sprites/import` que quantiza a paleta).
+   Ainda não apagado — decisão de limpeza deixada para o usuário
+   confirmar.
 
 ## Sessão de 19/08/2026 (Claude Code)
 

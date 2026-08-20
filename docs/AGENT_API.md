@@ -243,6 +243,28 @@ GET /api/sprites/{id}/export.png?frame=0&scale=8
 - `scale=8`/`16` → PNG ampliado com nearest-neighbor (pixels quadrados
   nítidos), útil só para inspeção visual, não para o asset final.
 
+### Gerar folha/GIF de armadura (porte do ArmorHelper.exe)
+```
+GET /api/armor/actions
+GET /api/armor/generate?sprite_id={id}&action=Head&input_scale=1&output_scale=2&format=png
+```
+- `sprite_id` — sprite já existente no PixelForge, usado como template de
+  origem (ex: um sprite importado via `import` a partir do
+  `ArmorTemplate_v1.png` original, 128×80).
+- `action` — uma das retornadas por `GET /api/armor/actions`: `Head`,
+  `Body`, `Female`, `Legs`, `Arms`, `FullArmor`, `FullArmorFemale`.
+- `input_scale` — densidade do template de origem (1 = nativo 128×80,
+  igual ao `.exe` original; maior se o template já for uma referência
+  em mais qualidade, ex: 4x/5x).
+- `output_scale` — densidade da folha de saída (2 = igual ao `.exe`
+  original, que sempre faz upscale fixo em 2x).
+- `format=png` devolve a folha estática (40×output_scale × 1120×output_scale
+  em unidades escaladas); `format=gif` devolve animação de 52 frames
+  (66ms/frame, loop infinito), mesma sequência do `SaveAsGif()` original.
+- Head/Body/Female/Legs/Arms validados pixel-a-pixel (0% de diferença)
+  contra saídas reais do `.exe` original. FullArmor/FullArmorFemale
+  compõem essas mesmas peças já validadas, na ordem do original.
+
 ## Boas práticas para o agente
 
 - Sempre confira `width`/`height` do sprite antes de mandar

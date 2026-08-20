@@ -402,6 +402,50 @@ input#sprite-w, input#sprite-h { width: 56px; }
 }
 .modal-header-actions label.btn { cursor: pointer; }
 
+.armor-gif-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 18px;
+  align-items: end;
+}
+.armor-gif-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.armor-gif-form select,
+.armor-gif-form input {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.armor-gif-result {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 18px 18px;
+}
+.armor-gif-result.hidden { display: none; }
+.armor-gif-result img {
+  max-height: 320px;
+  image-rendering: pixelated;
+  border: 1px solid var(--line);
+  background: repeating-conic-gradient(#2a2a2a 0% 25%, #333 0% 50%) 50% / 16px 16px;
+}
+.armor-gif-error {
+  padding: 0 18px 18px;
+  color: var(--danger);
+  font-size: 12px;
+}
+.armor-gif-error.hidden { display: none; }
+
 .gallery-empty {
   padding: 40px 18px;
   text-align: center;

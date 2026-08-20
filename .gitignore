@@ -4,4 +4,19 @@ __pycache__/
 venv/
 backend/data/sprites/*.json
 backend/data/exports/*.png
+backend/data/armor_exports/
+backend/data/project_exports/
 .DS_Store
+
+# Area de dev-upload descartavel (binarios de terceiros, ferramentas de
+# decompilacao, logs) -- nao faz parte do produto, so existe nesta VPS
+# temporaria. Ver STATUS.md sessao 20/08.
+dev-uploads/
+dev-tools/
+dev_upload.log
+
+# Matrizes de referencia geradas/coladas manualmente (dados, nao codigo --
+# mesmo criterio de backend/data/sprites/*.json acima; ja vivem como
+# sprites versionados no app).
+/armor_template_v1_x4_ref.txt
+/base_model_armo.txt

@@ -535,12 +535,18 @@ const Gallery = {
       this.close();
     });
 
+    const downloadBtn = document.createElement("a");
+    downloadBtn.className = "btn";
+    downloadBtn.textContent = "Baixar";
+    downloadBtn.href = Api.exportUrl(meta.id, 0, 1);
+    downloadBtn.download = `${meta.id}.png`;
+
     const delBtn = document.createElement("button");
     delBtn.className = "btn btn-danger";
     delBtn.textContent = "Excluir";
     delBtn.addEventListener("click", () => this._delete(meta.id));
 
-    actions.append(openBtn, delBtn);
+    actions.append(openBtn, downloadBtn, delBtn);
     card.append(thumb, id, info, actions);
     return card;
   },
@@ -757,10 +763,93 @@ function renderPixelGridReport(width, height) {
   out.classList.remove("hidden");
 }
 
+const ArmorGifPanel = {
+  modal: null,
+  spriteSelect: null,
+  actionSelect: null,
+  inputScale: null,
+  outputScale: null,
+  formatSelect: null,
+  result: null,
+  preview: null,
+  download: null,
+  error: null,
+  lastObjectUrl: null,
+
+  init() {
+    this.modal = document.getElementById("armor-gif-modal");
+    this.spriteSelect = document.getElementById("armor-sprite-select");
+    this.actionSelect = document.getElementById("armor-action-select");
+    this.inputScale = document.getElementById("armor-input-scale");
+    this.outputScale = document.getElementById("armor-output-scale");
+    this.formatSelect = document.getElementById("armor-format-select");
+    this.result = document.getElementById("armor-gif-result");
+    this.preview = document.getElementById("armor-gif-preview");
+    this.download = document.getElementById("armor-gif-download");
+    this.error = document.getElementById("armor-gif-error");
+  },
+
+  async open() {
+    this.modal.classList.remove("hidden");
+    this.error.classList.add("hidden");
+    this.result.classList.add("hidden");
+    try {
+      const [sprites, actions] = await Promise.all([Api.listSpritesMeta(), Api.armorActions()]);
+      this.spriteSelect.innerHTML = sprites.map((s) => `<option value="${s.id}">${s.id}</option>`).join("");
+      this.actionSelect.innerHTML = actions.map((a) => `<option value="${a}">${a}</option>`).join("");
+    } catch (err) {
+      this.showError("Erro ao carregar opções: " + err.message);
+    }
+  },
+
+  close() {
+    this.modal.classList.add("hidden");
+  },
+
+  showError(msg) {
+    this.error.textContent = msg;
+    this.error.classList.remove("hidden");
+    this.result.classList.add("hidden");
+  },
+
+  async generate() {
+    const spriteId = this.spriteSelect.value;
+    if (!spriteId) return this.showError("Escolha um sprite de origem.");
+    const action = this.actionSelect.value;
+    const inputScale = this.inputScale.value || 1;
+    const outputScale = this.outputScale.value || 2;
+    const format = this.formatSelect.value;
+
+    this.error.classList.add("hidden");
+    const url = Api.armorGenerateUrl(spriteId, action, inputScale, outputScale, format);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(await res.text());
+      const blob = await res.blob();
+      if (this.lastObjectUrl) URL.revokeObjectURL(this.lastObjectUrl);
+      this.lastObjectUrl = URL.createObjectURL(blob);
+      this.preview.src = this.lastObjectUrl;
+      this.download.href = this.lastObjectUrl;
+      this.download.download = `${spriteId}_${action}.${format}`;
+      this.result.classList.remove("hidden");
+    } catch (err) {
+      this.showError("Erro ao gerar: " + err.message);
+    }
+  },
+};
+
 document.addEventListener("DOMContentLoaded", () => {
   SpriteCanvas.init();
   Gallery.init();
   AnimatedGrid.init();
+  ArmorGifPanel.init();
+
+  document.getElementById("btn-armor-gif").addEventListener("click", () => ArmorGifPanel.open());
+  document.getElementById("btn-armor-gif-close").addEventListener("click", () => ArmorGifPanel.close());
+  document.getElementById("armor-gif-modal").addEventListener("click", (e) => {
+    if (e.target.id === "armor-gif-modal") ArmorGifPanel.close();
+  });
+  document.getElementById("btn-armor-generate").addEventListener("click", () => ArmorGifPanel.generate());
 
   document.getElementById("btn-gallery").addEventListener("click", () => Gallery.open());
   document.getElementById("btn-gallery-close").addEventListener("click", () => Gallery.close());
@@ -770,6 +859,9 @@ document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !document.getElementById("gallery-modal").classList.contains("hidden")) {
       Gallery.close();
+    }
+    if (e.key === "Escape" && !document.getElementById("armor-gif-modal").classList.contains("hidden")) {
+      ArmorGifPanel.close();
     }
   });
   document.getElementById("import-file").addEventListener("change", (e) => {
