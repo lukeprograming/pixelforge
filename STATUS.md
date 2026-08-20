@@ -1,8 +1,36 @@
 # PixelForge — Status do projeto
 
-Última atualização: 20 de agosto de 2026 (instância local via localhost +
-launcher .desktop; porte do ArmorHelper + Terraria Sprite Transformer
-pra Python, aba de GIF de armadura)
+Última atualização: 20 de agosto de 2026 (detecção automática de
+densidade + sheet Terraria em qualquer escala; instância local via
+localhost + launcher .desktop; porte do ArmorHelper + Terraria Sprite
+Transformer pra Python, aba de GIF de armadura)
+
+## Sessão de 20/08/2026 (Claude Code) — escala livre no armor sheet gen
+
+Antes disso, `input_scale`/`output_scale` já eram parâmetros livres na
+API/UI, mas dois pontos travavam o uso real em densidade > 1x:
+
+- **Adivinhar o `input_scale` de um template novo era manual e propenso a
+  erro.** Agora `GET /api/armor/detect-scale?sprite_id=...` mede a bbox
+  de conteúdo opaco (não o canvas — `armor_template_v1_ref.png` é um
+  canvas 512x512 mas o conteúdo real é 512x320, que bate exato com 4x da
+  base 128x80; o canvas sozinho engana) e sugere 1x–4x. A aba "GIF
+  Armadura" já chama isso sozinha ao escolher o sprite e pré-preenche o
+  campo — continua editável manualmente, o detector nunca trava a escolha.
+- **`compose_terraria_sheet()` (porte do `.jar`) só funcionava em
+  `output_scale=2` fixo** — a tabela de 32 recortes tinha as coordenadas
+  do decompilado, todas em números pares, cravadas em pixels. Generalizada
+  pra escalar pra qualquer `output_scale`: derivei a base em 1x dividindo
+  a tabela por 2 (exato) e multipliquei de novo pela escala pedida.
+  `output_scale=2` continua **byte-idêntico** (0 pixels diferentes, testado)
+  contra `terraria_sheet_fixed_v1.png`, que veio da versão hardcoded antes
+  da mudança. `output_scale=4` roda e sai com as dimensões certas, mas
+  **sem arte de referência real em 4x pra diferenciar pixel a pixel** —
+  não tratar como validado no mesmo nível do resto até aparecer uma.
+- Nova action `"TerrariaSheet"` no `ACTIONS`/`/api/armor/generate` — gera
+  Body+Arm+Female do mesmo template e já compõe no sheet final num passo
+  só (antes só dava pra rodar via script solto, por isso a aba não tinha
+  como expor isso ainda).
 
 ## Sessão de 20/08/2026 (Claude Code) — instância local
 
