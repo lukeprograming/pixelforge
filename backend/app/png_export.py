@@ -176,6 +176,11 @@ def sprite_from_matrix_txt(
     Se a matriz não vier quadrada (ex: 60x40), ela é auto-ajustada pro
     maior lado (60x60), centralizada, com o restante transparente.
 
+    Linhas mais curtas que a mais longa da matriz (comum quando a matriz é
+    colada/gerada manualmente e uma linha perde células no final) são
+    auto-completadas com "0" (transparente) até bater a largura -- em vez
+    de rejeitar a importação inteira com erro.
+
     enforce_limit=False permite mais de max_palette cores únicas (sprite
     nasce com palette_locked=False) -- útil pra importar referências ricas
     em cor sem re-quantizar; o usuário pode travar depois no editor.
@@ -185,16 +190,13 @@ def sprite_from_matrix_txt(
         raise ValueError("Arquivo vazio")
 
     rows = [ln.split(",") for ln in lines]
-    width = len(rows[0])
+    width = max(len(row) for row in rows)
     height = len(rows)
     if width == 0:
         raise ValueError("Linha vazia na matriz")
-    for i, row in enumerate(rows):
-        if len(row) != width:
-            raise ValueError(
-                f"Linha {i} tem {len(row)} coluna(s), esperado {width} "
-                "(todas as linhas precisam ter o mesmo número de colunas)"
-            )
+    for row in rows:
+        if len(row) < width:
+            row.extend(["0"] * (width - len(row)))
     if width > 4096 or height > 4096:
         raise ValueError("Matriz excede o limite de 4096px por lado")
 
