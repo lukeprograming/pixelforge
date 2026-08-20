@@ -133,6 +133,13 @@ const Api = {
     return res.json();
   },
 
+  async detectArmorScale(spriteId, frame = 0) {
+    const params = new URLSearchParams({ sprite_id: spriteId, frame });
+    const res = await fetch(`/api/armor/detect-scale?${params.toString()}`);
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
   armorGenerateUrl(spriteId, action, inputScale, outputScale, format) {
     const params = new URLSearchParams({
       sprite_id: spriteId,

@@ -398,6 +398,24 @@ def list_armor_actions() -> List[str]:
     return sorted(armor_sheet_gen.ACTIONS.keys())
 
 
+@app.get("/api/armor/detect-scale")
+def detect_armor_input_scale(sprite_id: str, frame: int = 0, max_scale: int = 4) -> dict:
+    """
+    Mede o template e sugere o input_scale (1..max_scale) comparando a
+    bbox de conteudo opaco contra o template base (128x80). Usado pra
+    pre-preencher o campo no frontend -- o usuario ainda pode sobrescrever
+    manualmente, isto so evita ter que adivinhar a densidade de um
+    template novo (ex.: referencia 512x512 com conteudo real 512x320 ==
+    exatamente 4x, mas so a bbox revela isso, o canvas sozinho engana).
+    """
+    sprite = _get_sprite_or_404(sprite_id)
+    if frame >= len(sprite.frames):
+        raise HTTPException(400, "Frame inexistente")
+    template_img = png_export.render_frame_to_image(sprite, frame_index=frame)
+    template = np.array(template_img)
+    return armor_sheet_gen.detect_input_scale(template, max_scale=max_scale)
+
+
 @app.get("/api/armor/generate")
 def generate_armor_sheet(
     sprite_id: str,

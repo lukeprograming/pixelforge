@@ -7,6 +7,11 @@ venv/
 # nao faz parte do produto.
 /local_server.log
 /local_server.pid
+
+# Export local de todos os sprites em PNG (empacotamento pontual da
+# galeria) -- gerado sob demanda, mesmo criterio de armor_exports/ e
+# project_exports/ acima.
+/gallery_export/
 backend/data/sprites/*.json
 backend/data/exports/*.png
 backend/data/armor_exports/

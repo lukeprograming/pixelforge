@@ -426,6 +426,13 @@ input#sprite-w, input#sprite-h { width: 56px; }
   font-family: var(--mono);
   font-size: 12px;
 }
+.armor-scale-hint {
+  flex-basis: 100%;
+  order: 1;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: -6px;
+}
 .armor-gif-result {
   display: flex;
   align-items: center;

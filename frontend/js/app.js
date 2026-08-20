@@ -774,6 +774,7 @@ const ArmorGifPanel = {
   preview: null,
   download: null,
   error: null,
+  scaleHint: null,
   lastObjectUrl: null,
 
   init() {
@@ -787,16 +788,41 @@ const ArmorGifPanel = {
     this.preview = document.getElementById("armor-gif-preview");
     this.download = document.getElementById("armor-gif-download");
     this.error = document.getElementById("armor-gif-error");
+    this.scaleHint = document.getElementById("armor-scale-hint");
+    this.spriteSelect.addEventListener("change", () => this.detectScale());
+  },
+
+  async detectScale() {
+    const spriteId = this.spriteSelect.value;
+    if (!spriteId || !this.scaleHint) return;
+    this.scaleHint.textContent = "detectando…";
+    try {
+      const info = await Api.detectArmorScale(spriteId, 0);
+      if (info.detected_scale) {
+        this.inputScale.value = info.detected_scale;
+        this.scaleHint.textContent =
+          `detectado: ${info.detected_scale}x (conteúdo ${info.content_w}×${info.content_h}, ` +
+          `canvas ${info.canvas_w}×${info.canvas_h})`;
+      } else {
+        this.scaleHint.textContent =
+          `não bateu com 1x–4x exato (conteúdo ${info.content_w}×${info.content_h} vs base 128×80) ` +
+          `— escolha manualmente`;
+      }
+    } catch (err) {
+      this.scaleHint.textContent = "";
+    }
   },
 
   async open() {
     this.modal.classList.remove("hidden");
     this.error.classList.add("hidden");
     this.result.classList.add("hidden");
+    if (this.scaleHint) this.scaleHint.textContent = "";
     try {
       const [sprites, actions] = await Promise.all([Api.listSpritesMeta(), Api.armorActions()]);
       this.spriteSelect.innerHTML = sprites.map((s) => `<option value="${s.id}">${s.id}</option>`).join("");
       this.actionSelect.innerHTML = actions.map((a) => `<option value="${a}">${a}</option>`).join("");
+      this.detectScale();
     } catch (err) {
       this.showError("Erro ao carregar opções: " + err.message);
     }

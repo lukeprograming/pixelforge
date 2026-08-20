@@ -401,6 +401,13 @@ TERRARIA_SHEET_H = 224
 TERRARIA_INPUT_W = 40
 TERRARIA_INPUT_H = 1120
 
+# Todas as constantes acima e a tabela de recortes abaixo foram extraidas
+# do decompilado com output_scale=2 fixo (unico valor que o .jar original
+# suporta). Toda entrada da tabela e um numero par -- ou seja, e uma folha
+# em 1x multiplicada por 2 -- entao da pra derivar a base em 1x dividindo
+# por 2 (exato, sem arredondamento) e depois escalar pra qualquer
+# output_scale multiplicando de novo. E o que TERRARIA_SHEET_DRAWS_1X /
+# _terraria_draws_at() / compose_terraria_sheet(..., output_scale=N) fazem.
 TERRARIA_SHEET_DRAWS: list[tuple[str, int, int, int, int, int, int]] = [
     ("body", 12, 14, 22, 20, 12, 14),
     ("body", 12, 90, 16, 16, 12, 34),
@@ -439,27 +446,120 @@ TERRARIA_SHEET_DRAWS: list[tuple[str, int, int, int, int, int, int]] = [
 ]
 
 
-def compose_terraria_sheet(body: np.ndarray, arm: np.ndarray, female: np.ndarray) -> np.ndarray:
+# Base em 1x, derivada uma unica vez da tabela validada em 2x (divisao
+# exata -- ver comentario acima). _terraria_draws_at() escala essa base
+# pro output_scale pedido.
+TERRARIA_SHEET_DRAWS_1X: list[tuple[str, int, int, int, int, int, int]] = [
+    (name, sx // 2, sy // 2, sw // 2, sh // 2, dx // 2, dy // 2)
+    for name, sx, sy, sw, sh, dx, dy in TERRARIA_SHEET_DRAWS
+]
+
+
+def _terraria_draws_at(output_scale: int) -> list[tuple[str, int, int, int, int, int, int]]:
+    return [
+        (name, sx * output_scale, sy * output_scale, sw * output_scale,
+         sh * output_scale, dx * output_scale, dy * output_scale)
+        for name, sx, sy, sw, sh, dx, dy in TERRARIA_SHEET_DRAWS_1X
+    ]
+
+
+def compose_terraria_sheet(
+    body: np.ndarray, arm: np.ndarray, female: np.ndarray, output_scale: int = 2
+) -> np.ndarray:
     """
-    Porte do TerrariaSpriteTransform.jar: junta Body/Arm/Female (cada uma
-    40x1120) num sheet final 360x224, igual ao que o .jar original produz.
+    Porte do TerrariaSpriteTransform.jar: junta Body/Arm/Female num sheet
+    final unico, no layout que o tModLoader espera pra preview de
+    equipamento completo. O .jar original so suportava output_scale=2
+    (360x224); aqui a tabela de recortes e re-derivada pra qualquer escala
+    a partir da base em 1x (ver TERRARIA_SHEET_DRAWS_1X) -- output_scale=2
+    reproduz o original pixel-a-pixel (validado contra
+    terraria_sheet_fixed_v1.png, gerado pelo original antes desta
+    generalizacao).
     """
+    input_w = (TERRARIA_INPUT_W // 2) * output_scale
+    input_h = (TERRARIA_INPUT_H // 2) * output_scale
+    sheet_w = (TERRARIA_SHEET_W // 2) * output_scale
+    sheet_h = (TERRARIA_SHEET_H // 2) * output_scale
+
     sources = {"body": body, "arm": arm, "female": female}
     for name, img in sources.items():
         h, w = img.shape[:2]
-        if w != TERRARIA_INPUT_W or h != TERRARIA_INPUT_H:
+        if w != input_w or h != input_h:
             raise ValueError(
-                f"input '{name}' precisa ser {TERRARIA_INPUT_W}x{TERRARIA_INPUT_H} "
-                f"(recebido {w}x{h})"
+                f"input '{name}' precisa ser {input_w}x{input_h} pra "
+                f"output_scale={output_scale} (recebido {w}x{h})"
             )
 
-    dest = np.zeros((TERRARIA_SHEET_H, TERRARIA_SHEET_W, 4), dtype=np.uint8)
-    for name, sx, sy, sw, sh, dx, dy in TERRARIA_SHEET_DRAWS:
+    dest = np.zeros((sheet_h, sheet_w, 4), dtype=np.uint8)
+    for name, sx, sy, sw, sh, dx, dy in _terraria_draws_at(output_scale):
         sub = sources[name][sy:sy + sh, sx:sx + sw]
         mask = sub[:, :, 3] > 0
         region = dest[dy:dy + sh, dx:dx + sw]
         region[mask] = sub[mask]
     return dest
+
+
+def generate_terraria_sheet(template: np.ndarray, output_scale: int, input_scale: int = 1) -> np.ndarray:
+    """
+    Gera Body/Arm/Female a partir do mesmo template e ja compoe no sheet
+    final do tModLoader -- o fluxo completo que corresponde ao
+    TerrariaSpriteTransform.jar, num passo so.
+    """
+    body = generate_body_sheet(template, output_scale, input_scale)
+    arm = generate_arms_sheet(template, output_scale, input_scale)
+    female = generate_female_sheet(template, output_scale, input_scale)
+    return compose_terraria_sheet(body, arm, female, output_scale)
+
+
+def detect_input_scale(
+    template: np.ndarray,
+    base_w: int = TEMPLATE_W_1X,
+    base_h: int = TEMPLATE_H_1X,
+    max_scale: int = 4,
+) -> dict:
+    """
+    Mede a bbox de conteudo opaco (alpha > 0) do template -- nao o canvas
+    inteiro, que pode ter padding (caso real: armor_template_v1_ref.png e
+    um canvas 512x512 com o conteudo real ocupando so 512x320) -- e
+    confere se ela bate exatamente com base_w/base_h multiplicados por
+    1..max_scale, nos dois eixos (so o lado maior nao e suficiente: arte
+    distorcida podia bater no lado maior e errar no menor).
+
+    Retorna um dict com a bbox medida e o scale detectado (None se nao
+    bater com nenhum). O chamador decide o que fazer com None -- a UI
+    deixa o campo pro usuario escolher manualmente de qualquer jeito.
+    """
+    alpha = template[:, :, 3]
+    ys, xs = np.nonzero(alpha > 0)
+    if len(xs) == 0:
+        return {
+            "canvas_w": int(template.shape[1]),
+            "canvas_h": int(template.shape[0]),
+            "content_w": 0,
+            "content_h": 0,
+            "detected_scale": None,
+            "matches": {},
+        }
+
+    content_w = int(xs.max() - xs.min() + 1)
+    content_h = int(ys.max() - ys.min() + 1)
+
+    matches = {}
+    detected = None
+    for scale in range(1, max_scale + 1):
+        hit = content_w == base_w * scale and content_h == base_h * scale
+        matches[scale] = hit
+        if hit:
+            detected = scale
+
+    return {
+        "canvas_w": int(template.shape[1]),
+        "canvas_h": int(template.shape[0]),
+        "content_w": content_w,
+        "content_h": content_h,
+        "detected_scale": detected,
+        "matches": matches,
+    }
 
 
 ACTIONS = {
@@ -470,6 +570,7 @@ ACTIONS = {
     "Arms": generate_arms_sheet,
     "FullArmor": generate_full_armor_sheet,
     "FullArmorFemale": generate_full_armor_female_sheet,
+    "TerrariaSheet": generate_terraria_sheet,
 }
 
 
