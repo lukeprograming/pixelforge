@@ -72,7 +72,10 @@ pixelforge/
   por sprite quando necessário (ex: importar referência rica em cor)
 - Undo/redo (pilha de snapshots)
 - Traços do pincel são desenhados localmente e persistidos em um único lote no
-  mouse-up, com redraw limitado às regiões tocadas
+  mouse-up ou após 800 ms sem novas edições, com redraw limitado às regiões
+  tocadas; a barra inferior mostra pendente, salvando, salvo ou erro
+- O botão Salvar sincroniza integralmente o frame atual como garantia manual,
+  mesmo se um evento de mouse-up tiver sido perdido
 - Modo Animated: grade 2D de frames com duplicação em qualquer direção
   (esquerda/direita/cima/baixo), separado do sprite estático de origem
 - Camada de referência (decalque): importa uma imagem, exibida por
@@ -99,7 +102,8 @@ node frontend/tests/paint_ui_smoke.js
 ```
 
 O smoke da UI carrega o JavaScript real do editor e cobre arraste longo,
-espelho, máscara, fill, lote único por gesto e reabertura do sprite persistido.
+espelho, máscara, fill, lote único por gesto, autosave temporizado, botão
+Salvar e reabertura do sprite persistido.
 
 ## Próximos passos sugeridos
 

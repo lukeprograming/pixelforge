@@ -92,6 +92,21 @@ persiste o sprite uma única vez. Use este endpoint para gestos compostos ou
 edições em lote: ele evita uma serialização completa do sprite por região e
 retorna apenas um ACK leve, não a matriz inteira.
 
+### Sincronizar um frame completo
+```
+PUT /api/sprites/{id}/frame/{frame_index}
+{
+  "pixels": [
+    [0, 0, -1],
+    [-1, 1, -1]
+  ]
+}
+```
+Substitui integralmente a matriz do frame e persiste uma única vez. A altura,
+a largura de cada linha e todos os índices de paleta são validados antes da
+substituição. O editor usa esta rota no botão **Salvar** como garantia explícita
+de sincronização; para traços comuns, prefira `/stroke`.
+
 ### Atualizar paleta
 ```
 POST /api/sprites/{id}/palette
