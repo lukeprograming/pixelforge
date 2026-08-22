@@ -2,4 +2,4 @@
 
 - Branch: `ai/codex/gallery-armor-frame-fix-v1`.
 - Testes: 11 backend, smoke da UI e 4 syntax checks aprovados.
-- Escopo de salvamento/galeria concluído.
+- Escopo de salvamento/galeria concluído; manual é o padrão e auto é opcional.

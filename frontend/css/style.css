@@ -213,6 +213,15 @@ input#sprite-w, input#sprite-h { width: 56px; }
 .save-status.saved { color: var(--accent); }
 .save-status.error { color: var(--danger); }
 
+.autosave-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-dim);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 /* ---------- palette ---------- */
 
 .palette-header-row {
