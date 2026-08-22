@@ -6,4 +6,3 @@
 4. Adicionar modal de efeitos sonoros ao frontend existente.
 5. Cobrir serialização, segurança de nomes, erros externos e persistência com mocks.
 6. Validar backend, frontend estático e documentação sem realizar geração faturada.
-

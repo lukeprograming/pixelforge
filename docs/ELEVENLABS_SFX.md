@@ -53,4 +53,3 @@ Exemplo de payload:
   "loop": false
 }
 ```
-

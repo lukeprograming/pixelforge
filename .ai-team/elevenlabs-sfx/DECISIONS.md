@@ -11,4 +11,3 @@ A integração usará o endpoint oficial `POST /v1/sound-generation` e `mp3_4410
 ## 2026-08-22 — Testes sem créditos
 
 Toda resposta externa será simulada nos testes. Uma geração real só ocorre por ação explícita do usuário na interface.
-
