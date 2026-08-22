@@ -147,8 +147,6 @@ async function runPaintUiSmoke() {
   SpriteCanvas.width = created.width;
   SpriteCanvas.height = created.height;
   SpriteCanvas.pixels = created.frames[0].pixels.map((row) => row.slice());
-  assert.equal(AppState.autosaveEnabled, false);
-  setAutosaveEnabled(true);
 
   // Arraste longo: muitos carimbos locais, um único PATCH /stroke no mouse-up.
   AppState.tool = "pencil";
@@ -226,22 +224,16 @@ async function runPaintUiSmoke() {
   strokeCalls = requests.filter((request) => request.pathname.endsWith("/stroke"));
   assert.equal(strokeCalls.length, 5);
 
-  // No modo manual, pausa/mouse-up não chama /stroke; o botão Salvar faz uma
-  // única sincronização integral do frame.
-  setAutosaveEnabled(false);
-  const strokesBeforeManualEdit = requests.filter((request) => request.pathname.endsWith("/stroke")).length;
+  // O botão Salvar usa a sincronização integral do frame, além de aguardar
+  // qualquer traço pendente.
   beginPaintStroke();
   PaletteManager.selectedIndex = 1;
   await paintPixel(127, 7, { isDown: true });
-  assert.equal(hasUnsavedChanges(), true);
-  await new Promise((resolve) => setTimeout(resolve, AUTOSAVE_DELAY_MS + 40));
-  assert.equal(requests.filter((request) => request.pathname.endsWith("/stroke")).length, strokesBeforeManualEdit);
   assert.equal(await saveCurrentSprite(), true);
   const frameSaves = requests.filter((request) => request.method === "PUT" && request.pathname.includes("/frame/"));
   assert.equal(frameSaves.length, 1);
   assert.equal(elements["btn-save"].disabled, false);
   assert.equal(elements["save-status"].textContent, "● Salvo manualmente");
-  assert.equal(hasUnsavedChanges(), false);
   const manuallyReopened = await Api.getSprite(created.id);
   assert.deepEqual(manuallyReopened.frames[0].pixels, SpriteCanvas.pixels);
 

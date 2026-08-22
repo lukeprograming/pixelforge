@@ -71,12 +71,11 @@ pixelforge/
   cores usadas; checkbox "Travar em 30 cores" pra destravar o limite
   por sprite quando necessário (ex: importar referência rica em cor)
 - Undo/redo (pilha de snapshots)
-- Salvamento manual é o padrão: os traços ficam locais até o botão Salvar,
-  que sincroniza integralmente o frame atual; alterações pendentes ativam o
-  aviso nativo do navegador ao fechar ou recarregar a página
-- Autosave é opcional e fica desligado por padrão; quando ativado, persiste um
-  lote no mouse-up ou após 800 ms sem novas edições
-- O estado pendente, salvando, salvo ou erro aparece ao lado do botão Salvar
+- Traços do pincel são desenhados localmente e persistidos em um único lote no
+  mouse-up ou após 800 ms sem novas edições, com redraw limitado às regiões
+  tocadas; a barra inferior mostra pendente, salvando, salvo ou erro
+- O botão Salvar sincroniza integralmente o frame atual como garantia manual,
+  mesmo se um evento de mouse-up tiver sido perdido
 - Modo Animated: grade 2D de frames com duplicação em qualquer direção
   (esquerda/direita/cima/baixo), separado do sprite estático de origem
 - Camada de referência (decalque): importa uma imagem, exibida por

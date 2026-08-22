@@ -18,12 +18,12 @@ const AppState = {
   lockedColors: new Set(), // índices de paleta travados (protege TODO pixel daquela cor)
   lockedPixels: new Set(), // coordenadas "x,y" travadas, independente da cor
 
-  // Salvamento manual é o padrão. Quando o usuário ativa o autosave, cada
-  // traço volta a ser persistido como lote, preservando a ordem das respostas.
+  // Um traço comum é desenhado localmente e persistido como um único lote no
+  // mouse-up. A cadeia mantém a ordem caso o usuário comece outro traço antes
+  // da resposta do anterior chegar.
   pendingStroke: null,
   strokeFlushChain: Promise.resolve(),
   autosaveTimer: null,
-  autosaveEnabled: false,
   editVersion: 0,
   savedVersion: 0,
 };
@@ -37,26 +37,9 @@ function setSaveStatus(state, message) {
   status.textContent = message;
 }
 
-function hasUnsavedChanges() {
-  return AppState.savedVersion < AppState.editVersion;
-}
-
-function setAutosaveEnabled(enabled) {
-  AppState.autosaveEnabled = Boolean(enabled);
-  clearTimeout(AppState.autosaveTimer);
-  AppState.autosaveTimer = null;
-  AppState.pendingStroke = null;
-  if (hasUnsavedChanges()) {
-    setSaveStatus("pending", "● Alterações pendentes");
-  } else {
-    setSaveStatus("saved", AppState.autosaveEnabled ? "● Salvo • Auto" : "● Salvo • Manual");
-  }
-}
-
 function scheduleAutosave() {
   clearTimeout(AppState.autosaveTimer);
   setSaveStatus("pending", "● Alterações pendentes");
-  if (!AppState.autosaveEnabled) return;
   AppState.autosaveTimer = setTimeout(() => {
     AppState.autosaveTimer = null;
     void flushPaintStroke();
@@ -69,25 +52,17 @@ function toolChangesPixels() {
 
 function beginPaintStroke() {
   if (!AppState.spriteId || !toolChangesPixels()) return;
-  if (AppState.autosaveEnabled) {
-    if (AppState.pendingStroke?.regions.length) void flushPaintStroke();
-    AppState.pendingStroke = {
-      spriteId: AppState.spriteId,
-      frame: AppState.activeFrameIndex ?? 0,
-      regions: [],
-    };
-  } else {
-    AppState.pendingStroke = null;
-  }
+  if (AppState.pendingStroke?.regions.length) void flushPaintStroke();
+  AppState.pendingStroke = {
+    spriteId: AppState.spriteId,
+    frame: AppState.activeFrameIndex ?? 0,
+    regions: [],
+  };
   pushUndoSnapshot();
 }
 
 function queueStrokeRegions(regions) {
   if (!regions.length || !AppState.spriteId) return;
-  AppState.editVersion++;
-  setSaveStatus("pending", "● Alterações pendentes");
-  if (!AppState.autosaveEnabled) return;
-
   const frame = AppState.activeFrameIndex ?? 0;
   if (
     !AppState.pendingStroke ||
@@ -105,13 +80,13 @@ function queueStrokeRegions(regions) {
       palette_index: paletteIndex,
     }))
   );
+  AppState.editVersion++;
   scheduleAutosave();
 }
 
 function flushPaintStroke() {
   clearTimeout(AppState.autosaveTimer);
   AppState.autosaveTimer = null;
-  if (!AppState.autosaveEnabled) return AppState.strokeFlushChain;
   const stroke = AppState.pendingStroke;
   AppState.pendingStroke = null;
   if (!stroke?.regions.length) return AppState.strokeFlushChain;
@@ -163,12 +138,7 @@ async function saveCurrentSprite() {
   if (button) button.disabled = true;
   setSaveStatus("saving", "● Salvando…");
   try {
-    // O frame completo é a fonte da verdade do save manual. Descarta qualquer
-    // lote incremental ainda não enviado e aguarda apenas autosaves anteriores.
-    clearTimeout(AppState.autosaveTimer);
-    AppState.autosaveTimer = null;
-    AppState.pendingStroke = null;
-    await AppState.strokeFlushChain;
+    await flushPaintStroke();
     const snapshot = SpriteCanvas.pixels.map((row) => row.slice());
     const snapshotVersion = AppState.editVersion;
     await Api.saveFrame(AppState.spriteId, snapshot, AppState.activeFrameIndex ?? 0);
@@ -468,7 +438,7 @@ function applySprite(sprite) {
   AppState.savedVersion = 0;
   clearTimeout(AppState.autosaveTimer);
   AppState.autosaveTimer = null;
-  setSaveStatus("saved", AppState.autosaveEnabled ? "● Salvo • Auto" : "● Salvo • Manual");
+  setSaveStatus("saved", "● Salvo");
   document.getElementById("sprite-id").value = sprite.id;
   document.getElementById("sprite-w").value = sprite.width;
   document.getElementById("sprite-h").value = sprite.height;
@@ -1231,7 +1201,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // frame ativo no sprite completo em memória e atualiza as miniaturas da
   // grade (feito no fim do traço, não a cada pixel, por custo)
   window.addEventListener("mouseup", () => {
-    if (AppState.autosaveEnabled) void flushPaintStroke();
+    void flushPaintStroke();
     if (AppState.mode === "animated" && AppState.animatedSprite) {
       AppState.animatedSprite.frames[AppState.activeFrameIndex].pixels = SpriteCanvas.pixels.map((r) =>
         r.slice()
@@ -1239,14 +1209,12 @@ document.addEventListener("DOMContentLoaded", () => {
       AnimatedGrid.render();
     }
   });
-  window.addEventListener("blur", () => {
-    if (AppState.autosaveEnabled) void flushPaintStroke();
-  });
+  window.addEventListener("blur", () => void flushPaintStroke());
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden && AppState.autosaveEnabled) void flushPaintStroke();
+    if (document.hidden) void flushPaintStroke();
   });
   window.addEventListener("beforeunload", (event) => {
-    if (hasUnsavedChanges()) {
+    if (AppState.pendingStroke?.regions.length || AppState.savedVersion < AppState.editVersion) {
       event.preventDefault();
       event.returnValue = "";
     }
@@ -1258,10 +1226,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("mirror-x").addEventListener("change", (e) => {
     AppState.mirrorX = e.target.checked;
-  });
-
-  document.getElementById("autosave-enabled").addEventListener("change", (event) => {
-    setAutosaveEnabled(event.target.checked);
   });
 
   document.getElementById("axis-lock").addEventListener("change", (e) => {
