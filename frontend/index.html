@@ -24,6 +24,7 @@
         <button id="btn-save" class="btn btn-primary">Salvar</button>
         <button id="btn-gallery" class="btn">🖼️ Galeria</button>
         <button id="btn-armor-gif" class="btn">🛡️ GIF Armadura</button>
+        <button id="btn-audio-sfx" class="btn">🔊 Efeitos</button>
         <a id="btn-export-project" class="btn" href="/api/project/export.zip" download="pixelforge_project.zip" title="Baixa um .zip com o estado atual de todo o projeto (código + dados), exceto .venv">⬇️ Projeto (.zip)</a>
       </div>
 
@@ -246,6 +247,52 @@
         <a id="armor-gif-download" class="btn btn-primary" download>⬇️ Baixar</a>
       </div>
       <div id="armor-gif-error" class="armor-gif-error hidden"></div>
+    </div>
+  </div>
+
+  <div id="audio-sfx-modal" class="modal-overlay hidden">
+    <div class="modal audio-sfx-modal">
+      <div class="modal-header">
+        <div>
+          <h2>Gerador de efeitos sonoros — ElevenLabs</h2>
+          <div id="audio-key-status" class="audio-key-status">Verificando configuração local…</div>
+        </div>
+        <div class="modal-header-actions">
+          <button id="btn-audio-sfx-close" class="btn" title="Fechar">✕</button>
+        </div>
+      </div>
+      <div class="audio-sfx-form">
+        <label>
+          Nome do arquivo
+          <input id="audio-label" type="text" maxlength="80" value="healer-armor-effect" />
+        </label>
+        <label class="audio-prompt-field">
+          Descrição do efeito <span id="audio-prompt-count" class="muted">0/450</span>
+          <textarea id="audio-prompt" maxlength="450" rows="5" placeholder="Ex.: impacto celestial curto, cristal de cura ressoando, brilho dourado, one-shot limpo para jogo"></textarea>
+        </label>
+        <label>
+          Duração em segundos
+          <input id="audio-duration" type="number" min="0.5" max="30" step="0.5" value="2" />
+        </label>
+        <label>
+          Influência do prompt: <span id="audio-influence-label">0.30</span>
+          <input id="audio-influence" type="range" min="0" max="1" step="0.05" value="0.3" />
+        </label>
+        <label class="toggle audio-loop-toggle">
+          <input id="audio-loop" type="checkbox" />
+          Criar loop suave
+        </label>
+        <div class="audio-credit-warning">
+          Cada clique em Gerar chama a API e consome créditos. O PixelForge gera uma variação por chamada.
+        </div>
+        <button id="btn-audio-generate" class="btn btn-accent">Gerar efeito</button>
+      </div>
+      <div id="audio-sfx-result" class="audio-sfx-result hidden">
+        <audio id="audio-sfx-preview" controls></audio>
+        <div id="audio-sfx-meta" class="muted"></div>
+        <a id="audio-sfx-download" class="btn btn-primary" download>⬇️ Baixar MP3</a>
+      </div>
+      <div id="audio-sfx-error" class="audio-sfx-error hidden"></div>
     </div>
   </div>
 

@@ -124,3 +124,11 @@ class FrameDuplicateResult(BaseModel):
     sprite: Sprite
     frame_index: int
     created: bool  # False = já existia um frame naquela posição da grade; só trocamos o foco
+
+
+class SoundEffectCreate(BaseModel):
+    label: str = Field(min_length=1, max_length=80)
+    text: str = Field(min_length=1, max_length=450)
+    duration_seconds: Optional[float] = Field(default=2.0, ge=0.5, le=30)
+    prompt_influence: float = Field(default=0.3, ge=0, le=1)
+    loop: bool = False

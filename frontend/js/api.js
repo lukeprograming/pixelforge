@@ -151,6 +151,31 @@ const Api = {
     return `/api/armor/generate?${params.toString()}`;
   },
 
+  async audioStatus() {
+    const res = await fetch("/api/audio/status");
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  async generateSoundEffect(payload) {
+    const res = await fetch("/api/audio/sound-effects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      let message = await res.text();
+      try {
+        const parsed = JSON.parse(message);
+        message = parsed.detail || message;
+      } catch (_) {
+        // Mantém a resposta textual do backend.
+      }
+      throw new Error(message);
+    }
+    return res.json();
+  },
+
   exportMatrixTxtUrl(id, frame = 0) {
     return `/api/sprites/${encodeURIComponent(id)}/export.txt?frame=${frame}`;
   },

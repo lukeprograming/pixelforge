@@ -864,11 +864,119 @@ const ArmorGifPanel = {
   },
 };
 
+const AudioSfxPanel = {
+  modal: null,
+  keyStatus: null,
+  label: null,
+  prompt: null,
+  duration: null,
+  influence: null,
+  influenceLabel: null,
+  loop: null,
+  generateButton: null,
+  result: null,
+  preview: null,
+  download: null,
+  meta: null,
+  error: null,
+
+  init() {
+    this.modal = document.getElementById("audio-sfx-modal");
+    this.keyStatus = document.getElementById("audio-key-status");
+    this.label = document.getElementById("audio-label");
+    this.prompt = document.getElementById("audio-prompt");
+    this.duration = document.getElementById("audio-duration");
+    this.influence = document.getElementById("audio-influence");
+    this.influenceLabel = document.getElementById("audio-influence-label");
+    this.loop = document.getElementById("audio-loop");
+    this.generateButton = document.getElementById("btn-audio-generate");
+    this.result = document.getElementById("audio-sfx-result");
+    this.preview = document.getElementById("audio-sfx-preview");
+    this.download = document.getElementById("audio-sfx-download");
+    this.meta = document.getElementById("audio-sfx-meta");
+    this.error = document.getElementById("audio-sfx-error");
+
+    this.prompt.addEventListener("input", () => {
+      document.getElementById("audio-prompt-count").textContent = `${this.prompt.value.length}/450`;
+    });
+    this.influence.addEventListener("input", () => {
+      this.influenceLabel.textContent = Number(this.influence.value).toFixed(2);
+    });
+  },
+
+  async open() {
+    this.modal.classList.remove("hidden");
+    this.error.classList.add("hidden");
+    try {
+      const status = await Api.audioStatus();
+      this.keyStatus.textContent = status.configured
+        ? `● API local configurada — ${status.model_id}`
+        : "● Chave ausente — configure ELEVENLABS_API_KEY em pixelforge/.env";
+      this.keyStatus.classList.toggle("configured", status.configured);
+      this.generateButton.disabled = !status.configured;
+    } catch (err) {
+      this.keyStatus.textContent = "Não foi possível consultar o backend local.";
+      this.keyStatus.classList.remove("configured");
+      this.generateButton.disabled = true;
+    }
+  },
+
+  close() {
+    this.modal.classList.add("hidden");
+  },
+
+  showError(message) {
+    this.error.textContent = message;
+    this.error.classList.remove("hidden");
+    this.result.classList.add("hidden");
+  },
+
+  async generate() {
+    const text = this.prompt.value.trim();
+    const label = this.label.value.trim();
+    const duration = Number(this.duration.value);
+    if (!label) return this.showError("Informe um nome para o arquivo.");
+    if (!text) return this.showError("Descreva o efeito sonoro que deseja gerar.");
+    if (!Number.isFinite(duration) || duration < 0.5 || duration > 30) {
+      return this.showError("A duração precisa estar entre 0,5 e 30 segundos.");
+    }
+
+    this.error.classList.add("hidden");
+    this.result.classList.add("hidden");
+    this.generateButton.disabled = true;
+    const originalText = this.generateButton.textContent;
+    this.generateButton.textContent = "Gerando…";
+    try {
+      const generated = await Api.generateSoundEffect({
+        label,
+        text,
+        duration_seconds: duration,
+        prompt_influence: Number(this.influence.value),
+        loop: this.loop.checked,
+      });
+      this.preview.src = generated.url;
+      this.download.href = generated.url;
+      this.download.download = generated.filename;
+      const sizeKb = Math.max(1, Math.round(generated.size_bytes / 1024));
+      const cost = generated.credit_cost ? ` · custo informado: ${generated.credit_cost}` : "";
+      this.meta.textContent = `${generated.filename} · ${sizeKb} KB${cost}`;
+      this.result.classList.remove("hidden");
+      this.preview.play().catch(() => {});
+    } catch (err) {
+      this.showError(err.message);
+    } finally {
+      this.generateButton.disabled = false;
+      this.generateButton.textContent = originalText;
+    }
+  },
+};
+
 document.addEventListener("DOMContentLoaded", () => {
   SpriteCanvas.init();
   Gallery.init();
   AnimatedGrid.init();
   ArmorGifPanel.init();
+  AudioSfxPanel.init();
 
   document.getElementById("btn-armor-gif").addEventListener("click", () => ArmorGifPanel.open());
   document.getElementById("btn-armor-gif-close").addEventListener("click", () => ArmorGifPanel.close());
@@ -876,6 +984,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.target.id === "armor-gif-modal") ArmorGifPanel.close();
   });
   document.getElementById("btn-armor-generate").addEventListener("click", () => ArmorGifPanel.generate());
+
+  document.getElementById("btn-audio-sfx").addEventListener("click", () => AudioSfxPanel.open());
+  document.getElementById("btn-audio-sfx-close").addEventListener("click", () => AudioSfxPanel.close());
+  document.getElementById("audio-sfx-modal").addEventListener("click", (e) => {
+    if (e.target.id === "audio-sfx-modal") AudioSfxPanel.close();
+  });
+  document.getElementById("btn-audio-generate").addEventListener("click", () => AudioSfxPanel.generate());
 
   document.getElementById("btn-gallery").addEventListener("click", () => Gallery.open());
   document.getElementById("btn-gallery-close").addEventListener("click", () => Gallery.close());
@@ -888,6 +1003,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (e.key === "Escape" && !document.getElementById("armor-gif-modal").classList.contains("hidden")) {
       ArmorGifPanel.close();
+    }
+    if (e.key === "Escape" && !document.getElementById("audio-sfx-modal").classList.contains("hidden")) {
+      AudioSfxPanel.close();
     }
   });
   document.getElementById("import-file").addEventListener("change", (e) => {

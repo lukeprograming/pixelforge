@@ -453,6 +453,80 @@ input#sprite-w, input#sprite-h { width: 56px; }
 }
 .armor-gif-error.hidden { display: none; }
 
+/* ---------- efeitos sonoros ElevenLabs ---------- */
+
+.audio-sfx-modal { width: min(760px, 100%); }
+
+.audio-key-status {
+  margin-top: 5px;
+  color: var(--danger);
+  font-size: 11px;
+}
+.audio-key-status.configured { color: var(--accent); }
+
+.audio-sfx-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr);
+  gap: 14px;
+  padding: 18px;
+  align-items: end;
+}
+.audio-sfx-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+.audio-sfx-form input[type="text"],
+.audio-sfx-form input[type="number"],
+.audio-sfx-form textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg-2);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.audio-sfx-form textarea { resize: vertical; }
+.audio-prompt-field { grid-column: 1 / -1; }
+.audio-loop-toggle { align-self: center; }
+.audio-credit-warning {
+  grid-column: 1 / -1;
+  padding: 9px 11px;
+  border: 1px solid #735b24;
+  border-radius: 4px;
+  background: rgba(181, 135, 31, 0.12);
+  color: #d8bd73;
+  font-size: 11px;
+}
+.audio-sfx-form .btn { justify-self: start; }
+.audio-sfx-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px 18px;
+}
+.audio-sfx-result.hidden { display: none; }
+.audio-sfx-result audio { width: min(420px, 100%); }
+.audio-sfx-meta { flex-basis: 100%; font-size: 11px; }
+.audio-sfx-error {
+  padding: 0 18px 18px;
+  color: var(--danger);
+  font-size: 12px;
+}
+.audio-sfx-error.hidden { display: none; }
+
+@media (max-width: 640px) {
+  .audio-sfx-form { grid-template-columns: 1fr; }
+  .audio-prompt-field,
+  .audio-credit-warning { grid-column: 1; }
+}
+
 .gallery-empty {
   padding: 40px 18px;
   text-align: center;

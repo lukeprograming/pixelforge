@@ -19,6 +19,13 @@ uvicorn app.main:app --reload --port 8000
 Abra `http://localhost:8000` — o editor e a API rodam no mesmo
 processo.
 
+### ElevenLabs — efeitos sonoros
+
+Copie `.env.example` para `.env`, coloque sua chave em
+`ELEVENLABS_API_KEY` e reinicie o servidor. Depois use o botão
+`🔊 Efeitos`. A chave permanece no backend local e é excluída do Git e
+do ZIP do projeto. Instruções completas em `docs/ELEVENLABS_SFX.md`.
+
 ## Estrutura
 
 ```
@@ -77,6 +84,8 @@ pixelforge/
   ou levar pra outro sprite
 - Botão "Analisar sprite" — mostra contagem de cores, bounding box e
   simetria, útil pro seu estudo de padrões do Terraria/Calamity
+- Gerador local de efeitos sonoros ElevenLabs com prompt, duração,
+  influência, loop, preview e download MP3; a chave nunca chega ao navegador
 
 ## Próximos passos sugeridos
 

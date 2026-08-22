@@ -22,7 +22,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import armor_sheet_gen, png_export, storage
+from . import armor_sheet_gen, elevenlabs_sfx, png_export, storage
 from .models import (
     MAX_PALETTE_COLORS,
     ExportToAnimated,
@@ -37,6 +37,7 @@ from .models import (
     Sprite,
     SpriteCreate,
     SpriteSummary,
+    SoundEffectCreate,
 )
 
 _GRID_DIRECTIONS = {
@@ -461,11 +462,63 @@ def generate_armor_sheet(
 
 
 # ---------------------------------------------------------------------------
+# Efeitos sonoros locais via ElevenLabs
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/audio/status")
+def audio_provider_status() -> dict:
+    """Nunca devolve a chave; informa apenas se o backend local a encontrou."""
+    return {
+        "provider": "elevenlabs",
+        "configured": elevenlabs_sfx.api_key_configured(),
+        "model_id": elevenlabs_sfx.DEFAULT_MODEL_ID,
+        "output_format": elevenlabs_sfx.DEFAULT_OUTPUT_FORMAT,
+    }
+
+
+@app.post("/api/audio/sound-effects")
+def create_sound_effect(payload: SoundEffectCreate) -> JSONResponse:
+    try:
+        generated = elevenlabs_sfx.generate_sound_effect(
+            text=payload.text,
+            duration_seconds=payload.duration_seconds,
+            prompt_influence=payload.prompt_influence,
+            loop=payload.loop,
+        )
+        path = elevenlabs_sfx.save_sound_effect(generated.audio, payload.label)
+    except elevenlabs_sfx.SoundEffectError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
+
+    return JSONResponse(
+        {
+            "filename": path.name,
+            "url": f"/api/audio/files/{path.name}",
+            "media_type": generated.media_type,
+            "size_bytes": len(generated.audio),
+            "request_id": generated.request_id,
+            "credit_cost": generated.credit_cost,
+        }
+    )
+
+
+@app.get("/api/audio/files/{filename}")
+def download_sound_effect(filename: str):
+    if filename != Path(filename).name or not filename.endswith(".mp3"):
+        raise HTTPException(400, "Nome de arquivo de áudio inválido")
+    path = elevenlabs_sfx.AUDIO_EXPORT_DIR / filename
+    if not path.is_file():
+        raise HTTPException(404, "Áudio não encontrado")
+    return FileResponse(path, media_type="audio/mpeg", filename=path.name)
+
+
+# ---------------------------------------------------------------------------
 # Export do projeto inteiro (.zip) -- pra backup manual / levar pro PC local
 # ---------------------------------------------------------------------------
 
 _PROJECT_ZIP_EXCLUDE_DIRS = {".venv", "__pycache__", "node_modules", "project_exports"}
 _PROJECT_ZIP_EXCLUDE_SUFFIXES = {".pyc"}
+_PROJECT_ZIP_EXCLUDE_FILES = {".env"}
 
 
 @app.get("/api/project/export.zip")
@@ -476,6 +529,8 @@ def export_project_zip():
             if path.is_dir():
                 continue
             if any(part in _PROJECT_ZIP_EXCLUDE_DIRS for part in path.parts):
+                continue
+            if path.name in _PROJECT_ZIP_EXCLUDE_FILES:
                 continue
             if path.suffix in _PROJECT_ZIP_EXCLUDE_SUFFIXES:
                 continue
