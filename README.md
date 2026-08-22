@@ -48,6 +48,8 @@ pixelforge/
       palette.js          # paleta (30 cores por padrão, destravável)
       canvas.js             # render do grid + camada de referência
       app.js                  # ferramentas, undo, espelho, export/import
+    tests/
+      paint_ui_smoke.js       # smoke de gestos e persistência da UI
   docs/
     AGENT_API.md         # documentação da API para agentes
   deploy/
@@ -88,6 +90,16 @@ pixelforge/
   simetria, útil pro seu estudo de padrões do Terraria/Calamity
 - Gerador local de efeitos sonoros ElevenLabs com prompt, duração,
   influência, loop, preview e download MP3; a chave nunca chega ao navegador
+
+## Testes
+
+```bash
+PYTHONPATH=backend backend/.venv/bin/python -m unittest discover -s backend/tests -v
+node frontend/tests/paint_ui_smoke.js
+```
+
+O smoke da UI carrega o JavaScript real do editor e cobre arraste longo,
+espelho, máscara, fill, lote único por gesto e reabertura do sprite persistido.
 
 ## Próximos passos sugeridos
 

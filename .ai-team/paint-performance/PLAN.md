@@ -5,4 +5,5 @@
 3. Acumular regiões no frontend até mouse-up — concluído.
 4. Cobrir persistência única e rejeição atômica — concluído.
 5. Rodar testes, syntax check e benchmark — concluído.
-6. Entregar ao Claude para revisão — pronto.
+6. Validar gestos da UI com o JavaScript real — concluído.
+7. Entregar ao Claude para revisão — pronto.
