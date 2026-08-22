@@ -8,7 +8,7 @@ from unittest.mock import patch
 from fastapi import HTTPException
 
 from app import main, storage
-from app.models import Frame, Sprite, StrokeEdit, StrokeRegion
+from app.models import Frame, FramePixelsUpdate, Sprite, StrokeEdit, StrokeRegion
 
 
 def make_sprite() -> Sprite:
@@ -66,6 +66,38 @@ class PaintPerformanceTests(unittest.TestCase):
         with patch.object(main.storage, "load", return_value=sprite), patch.object(main.storage, "save") as save:
             with self.assertRaises(HTTPException) as raised:
                 main.apply_stroke(sprite.id, edit)
+
+        self.assertEqual(raised.exception.status_code, 400)
+        self.assertEqual(sprite.frames[0].pixels, before)
+        save.assert_not_called()
+
+    def test_manual_save_replaces_frame_with_one_save(self) -> None:
+        sprite = make_sprite()
+        pixels = [
+            [0, 0, 1, -1],
+            [-1, 1, 1, -1],
+            [0, -1, 0, 1],
+        ]
+        payload = FramePixelsUpdate(pixels=pixels)
+        with patch.object(main.storage, "load", return_value=sprite), patch.object(main.storage, "save") as save:
+            result = main.replace_frame_pixels(sprite.id, 0, payload)
+
+        save.assert_called_once_with(sprite)
+        self.assertEqual(result["saved"], sprite.id)
+        self.assertEqual(sprite.frames[0].pixels, pixels)
+        self.assertIsNot(sprite.frames[0].pixels, pixels)
+
+    def test_invalid_manual_save_does_not_mutate_or_persist(self) -> None:
+        sprite = make_sprite()
+        before = [row[:] for row in sprite.frames[0].pixels]
+        payload = FramePixelsUpdate(pixels=[
+            [0, 0, 0, 0],
+            [0, 2, 0, 0],  # índice 2 não existe na paleta de duas cores
+            [0, 0, 0, 0],
+        ])
+        with patch.object(main.storage, "load", return_value=sprite), patch.object(main.storage, "save") as save:
+            with self.assertRaises(HTTPException) as raised:
+                main.replace_frame_pixels(sprite.id, 0, payload)
 
         self.assertEqual(raised.exception.status_code, 400)
         self.assertEqual(sprite.frames[0].pixels, before)

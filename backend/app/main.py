@@ -29,6 +29,7 @@ from .models import (
     Frame,
     FrameDuplicate,
     FrameDuplicateResult,
+    FramePixelsUpdate,
     PaletteColorDelete,
     PaletteLockUpdate,
     PaletteUpdate,
@@ -309,6 +310,37 @@ def get_frame(sprite_id: str, frame_index: int) -> Frame:
     if frame_index >= len(sprite.frames):
         raise HTTPException(404, "Frame inexistente")
     return sprite.frames[frame_index]
+
+
+@app.put("/api/sprites/{sprite_id}/frame/{frame_index}")
+def replace_frame_pixels(sprite_id: str, frame_index: int, payload: FramePixelsUpdate) -> dict:
+    """Sincroniza integralmente um frame com o canvas local.
+
+    É a garantia do botão Salvar: valida toda a matriz antes de substituir o
+    frame, de modo que um payload inválido não possa deixar o sprite parcial.
+    """
+    sprite = _get_sprite_or_404(sprite_id)
+    if not (0 <= frame_index < len(sprite.frames)):
+        raise HTTPException(404, "Frame inexistente")
+    if len(payload.pixels) != sprite.height:
+        raise HTTPException(400, f"Matriz precisa ter {sprite.height} linhas")
+
+    copied_pixels = []
+    for y, row in enumerate(payload.pixels):
+        if len(row) != sprite.width:
+            raise HTTPException(400, f"Linha {y} precisa ter {sprite.width} colunas")
+        for value in row:
+            if not (-1 <= value < len(sprite.palette)):
+                raise HTTPException(400, f"Índice de paleta inexistente na linha {y}")
+        copied_pixels.append(list(row))
+
+    sprite.frames[frame_index].pixels = copied_pixels
+    storage.save(sprite)
+    return {
+        "saved": sprite.id,
+        "frame": frame_index,
+        "updated_at": sprite.updated_at,
+    }
 
 
 @app.post("/api/sprites/{sprite_id}/frame", response_model=Sprite)

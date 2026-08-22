@@ -202,6 +202,12 @@ input#sprite-w, input#sprite-h { width: 56px; }
   font-size: 11px;
 }
 
+.save-status { margin-left: auto; }
+.save-status.pending { color: #e8b95f; }
+.save-status.saving { color: #7dc8ff; }
+.save-status.saved { color: var(--accent); }
+.save-status.error { color: var(--danger); }
+
 /* ---------- palette ---------- */
 
 .palette-header-row {

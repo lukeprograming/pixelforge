@@ -17,6 +17,7 @@ const appSource = fs.readFileSync(path.join(frontendRoot, "js", "app.js"), "utf8
 
 const sprites = new Map();
 const requests = [];
+const faults = { failNextFrameSave: false };
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -53,18 +54,18 @@ async function fetchMock(url, options = {}) {
     return response(200, sprite);
   }
 
-  const match = pathname.match(/^\/api\/sprites\/([^/]+)(\/stroke)?$/);
+  const match = pathname.match(/^\/api\/sprites\/([^/]+)(?:\/(stroke)|\/frame\/(\d+))?$/);
   if (!match) return response(404, "not found");
   const id = decodeURIComponent(match[1]);
   const sprite = sprites.get(id);
   if (!sprite) return response(404, "sprite not found");
 
-  if (method === "GET" && !match[2]) return response(200, sprite);
-  if (method === "DELETE" && !match[2]) {
+  if (method === "GET" && !match[2] && match[3] === undefined) return response(200, sprite);
+  if (method === "DELETE" && !match[2] && match[3] === undefined) {
     sprites.delete(id);
     return response(200, { deleted: id });
   }
-  if (method === "PATCH" && match[2]) {
+  if (method === "PATCH" && match[2] === "stroke") {
     const pixels = sprite.frames[body.frame].pixels;
     for (const region of body.regions) {
       for (let y = region.y0; y <= region.y1; y++) {
@@ -72,6 +73,14 @@ async function fetchMock(url, options = {}) {
       }
     }
     return response(200, { id, frame: body.frame, regions_applied: body.regions.length });
+  }
+  if (method === "PUT" && match[3] !== undefined) {
+    if (faults.failNextFrameSave) {
+      faults.failNextFrameSave = false;
+      return response(503, "save unavailable");
+    }
+    sprite.frames[Number(match[3])].pixels = clone(body.pixels);
+    return response(200, { saved: id, frame: Number(match[3]) });
   }
   return response(405, "method not allowed");
 }
@@ -94,9 +103,17 @@ const SpriteCanvas = {
   },
 };
 
+const elements = {
+  "save-status": { className: "", textContent: "" },
+  "btn-save": { disabled: false },
+  "analyze-out": { textContent: "" },
+};
+
 const context = vm.createContext({
   Api: undefined,
   assert,
+  elements,
+  faults,
   requests,
   SpriteCanvas,
   PaletteManager: { selectedIndex: 0, render() {} },
@@ -104,7 +121,7 @@ const context = vm.createContext({
   LockOverlay: { render() {} },
   document: {
     addEventListener() {},
-    getElementById() { return null; },
+    getElementById(id) { return elements[id] || null; },
   },
   window: { addEventListener() {} },
   fetch: fetchMock,
@@ -112,6 +129,7 @@ const context = vm.createContext({
   URLSearchParams,
   FormData,
   setTimeout,
+  clearTimeout,
   console,
 });
 
@@ -183,6 +201,41 @@ async function runPaintUiSmoke() {
   assert.equal(AppState.undoStack.length, 4);
   assert.ok(SpriteCanvas.dirtyRenderCount >= 102);
   assert.ok(SpriteCanvas.renderCount >= 1); // fill usa redraw integral uma vez
+
+  // O autosave também precisa funcionar sem um mouse-up explícito: uma pausa
+  // no traço dispara o flush temporizado.
+  AppState.tool = "pencil";
+  AppState.lockedPixels = new Set();
+  PaletteManager.selectedIndex = 0;
+  beginPaintStroke();
+  await paintPixel(120, 7, { isDown: true });
+  await new Promise((resolve) => setTimeout(resolve, AUTOSAVE_DELAY_MS + 40));
+  await AppState.strokeFlushChain;
+  assert.equal(AppState.pendingStroke, null);
+  assert.equal(elements["save-status"].className, "save-status saved");
+  assert.equal(elements["save-status"].textContent, "● Salvo automaticamente");
+  strokeCalls = requests.filter((request) => request.pathname.endsWith("/stroke"));
+  assert.equal(strokeCalls.length, 5);
+
+  // O botão Salvar usa a sincronização integral do frame, além de aguardar
+  // qualquer traço pendente.
+  beginPaintStroke();
+  PaletteManager.selectedIndex = 1;
+  await paintPixel(127, 7, { isDown: true });
+  assert.equal(await saveCurrentSprite(), true);
+  const frameSaves = requests.filter((request) => request.method === "PUT" && request.pathname.includes("/frame/"));
+  assert.equal(frameSaves.length, 1);
+  assert.equal(elements["btn-save"].disabled, false);
+  assert.equal(elements["save-status"].textContent, "● Salvo manualmente");
+  const manuallyReopened = await Api.getSprite(created.id);
+  assert.deepEqual(manuallyReopened.frames[0].pixels, SpriteCanvas.pixels);
+
+  // Falha real do botão precisa ficar visível e nunca deixá-lo travado.
+  faults.failNextFrameSave = true;
+  assert.equal(await saveCurrentSprite(), false);
+  assert.equal(elements["btn-save"].disabled, false);
+  assert.equal(elements["save-status"].className, "save-status error");
+  assert.match(elements["analyze-out"].textContent, /não foi possível salvar/);
 }
 
 runPaintUiSmoke();

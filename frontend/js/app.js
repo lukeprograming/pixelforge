@@ -23,7 +23,28 @@ const AppState = {
   // da resposta do anterior chegar.
   pendingStroke: null,
   strokeFlushChain: Promise.resolve(),
+  autosaveTimer: null,
+  editVersion: 0,
+  savedVersion: 0,
 };
+
+const AUTOSAVE_DELAY_MS = 800;
+
+function setSaveStatus(state, message) {
+  const status = document.getElementById("save-status");
+  if (!status) return;
+  status.className = `save-status ${state}`;
+  status.textContent = message;
+}
+
+function scheduleAutosave() {
+  clearTimeout(AppState.autosaveTimer);
+  setSaveStatus("pending", "● Alterações pendentes");
+  AppState.autosaveTimer = setTimeout(() => {
+    AppState.autosaveTimer = null;
+    void flushPaintStroke();
+  }, AUTOSAVE_DELAY_MS);
+}
 
 function toolChangesPixels() {
   return ["pencil", "eraser", "fill", "color-eraser"].includes(AppState.tool);
@@ -59,12 +80,17 @@ function queueStrokeRegions(regions) {
       palette_index: paletteIndex,
     }))
   );
+  AppState.editVersion++;
+  scheduleAutosave();
 }
 
 function flushPaintStroke() {
+  clearTimeout(AppState.autosaveTimer);
+  AppState.autosaveTimer = null;
   const stroke = AppState.pendingStroke;
   AppState.pendingStroke = null;
   if (!stroke?.regions.length) return AppState.strokeFlushChain;
+  const versionAtFlush = AppState.editVersion;
 
   // Remove somente repetições consecutivas. Uma deduplicação global seria
   // incorreta para sequências como cor A -> B -> A na mesma região.
@@ -77,6 +103,7 @@ function flushPaintStroke() {
   }
 
   AppState.strokeFlushChain = AppState.strokeFlushChain.then(async () => {
+    setSaveStatus("saving", "● Salvando…");
     try {
       await Api.applyStroke(stroke.spriteId, regions, stroke.frame);
     } catch {
@@ -86,12 +113,47 @@ function flushPaintStroke() {
         await Api.applyStroke(stroke.spriteId, regions, stroke.frame);
       } catch (secondError) {
         console.error("Falha ao persistir traço após nova tentativa:", secondError);
+        setSaveStatus("error", "● Erro ao salvar");
         const out = document.getElementById("analyze-out");
         if (out) out.textContent = `ERRO: o último traço não foi salvo (${secondError.message}).`;
+        return false;
       }
     }
+    AppState.savedVersion = Math.max(AppState.savedVersion, versionAtFlush);
+    if (AppState.editVersion === versionAtFlush && !AppState.pendingStroke?.regions.length) {
+      setSaveStatus("saved", "● Salvo automaticamente");
+    }
+    return true;
   });
   return AppState.strokeFlushChain;
+}
+
+async function saveCurrentSprite() {
+  if (!AppState.spriteId) {
+    alert("Crie ou abra um sprite primeiro.");
+    return false;
+  }
+
+  const button = document.getElementById("btn-save");
+  if (button) button.disabled = true;
+  setSaveStatus("saving", "● Salvando…");
+  try {
+    await flushPaintStroke();
+    const snapshot = SpriteCanvas.pixels.map((row) => row.slice());
+    const snapshotVersion = AppState.editVersion;
+    await Api.saveFrame(AppState.spriteId, snapshot, AppState.activeFrameIndex ?? 0);
+    AppState.savedVersion = Math.max(AppState.savedVersion, snapshotVersion);
+    if (AppState.editVersion === snapshotVersion) setSaveStatus("saved", "● Salvo manualmente");
+    return true;
+  } catch (error) {
+    console.error("Falha no salvamento manual:", error);
+    setSaveStatus("error", "● Erro ao salvar");
+    const out = document.getElementById("analyze-out");
+    if (out) out.textContent = `ERRO: não foi possível salvar (${error.message}).`;
+    return false;
+  } finally {
+    if (button) button.disabled = false;
+  }
 }
 
 // true se o pixel (x,y) está protegido pela ferramenta de máscara -- travado
@@ -371,6 +433,12 @@ function setActiveTool(tool) {
 
 function applySprite(sprite) {
   AppState.spriteId = sprite.id;
+  AppState.pendingStroke = null;
+  AppState.editVersion = 0;
+  AppState.savedVersion = 0;
+  clearTimeout(AppState.autosaveTimer);
+  AppState.autosaveTimer = null;
+  setSaveStatus("saved", "● Salvo");
   document.getElementById("sprite-id").value = sprite.id;
   document.getElementById("sprite-w").value = sprite.width;
   document.getElementById("sprite-h").value = sprite.height;
@@ -1130,6 +1198,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   window.addEventListener("blur", () => void flushPaintStroke());
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) void flushPaintStroke();
+  });
+  window.addEventListener("beforeunload", (event) => {
+    if (AppState.pendingStroke?.regions.length || AppState.savedVersion < AppState.editVersion) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+  });
 
   document.querySelectorAll(".tool-btn").forEach((btn) => {
     btn.addEventListener("click", () => setActiveTool(btn.dataset.tool));
@@ -1230,9 +1307,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("btn-new").addEventListener("click", newSprite);
   document.getElementById("btn-load").addEventListener("click", () => loadSprite());
-  document.getElementById("btn-save").addEventListener("click", () => {
-    if (AppState.spriteId) alert("Salvo automaticamente a cada edição.");
-  });
+  document.getElementById("btn-save").addEventListener("click", () => void saveCurrentSprite());
   document.getElementById("btn-export").addEventListener("click", exportPng);
   document.getElementById("btn-export-matrix").addEventListener("click", exportMatrixTxt);
   document.getElementById("btn-undo").addEventListener("click", undo);

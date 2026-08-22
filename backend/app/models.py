@@ -108,6 +108,10 @@ class StrokeEdit(BaseModel):
     regions: List[StrokeRegion] = Field(min_length=1, max_length=100_000)
 
 
+class FramePixelsUpdate(BaseModel):
+    pixels: List[List[int]]
+
+
 class PaletteUpdate(BaseModel):
     palette: List[str]
     # None = mantém o palette_locked atual do sprite; só sobrescreve se vier

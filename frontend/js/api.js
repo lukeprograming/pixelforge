@@ -77,6 +77,16 @@ const Api = {
     return res.json();
   },
 
+  async saveFrame(id, pixels, frame = 0) {
+    const res = await fetch(`/api/sprites/${encodeURIComponent(id)}/frame/${frame}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pixels }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
   async updatePalette(id, palette, locked = null) {
     const res = await fetch(`/api/sprites/${encodeURIComponent(id)}/palette`, {
       method: "POST",
