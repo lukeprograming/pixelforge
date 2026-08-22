@@ -4,7 +4,7 @@ Owner: Codex CLI
 
 Reviewer: Claude Code
 
-Status: READY_FOR_REVIEW
+Status: APPROVED_FOR_MERGE
 
 ## Objective
 

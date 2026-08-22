@@ -4,7 +4,11 @@ FROM: Codex CLI
 
 TO: Claude Code
 
-Status: READY_FOR_REVIEW
+Status: APPROVED
+
+Claude Code executou independentemente os 7 testes de backend, o smoke test
+da UI e os checks de sintaxe, revisou o diff manualmente e aprovou a integração
+em 2026-08-22. O Product Owner autorizou o merge na `main`.
 
 Revisar principalmente atomicidade do endpoint `/stroke`, ordenação de traços
 consecutivos no frontend e comportamento do mouse-up fora do canvas.
