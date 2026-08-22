@@ -103,6 +103,18 @@ class PaintPerformanceTests(unittest.TestCase):
         self.assertEqual(sprite.frames[0].pixels, before)
         save.assert_not_called()
 
+    def test_export_disables_browser_cache(self) -> None:
+        sprite = make_sprite()
+        with tempfile.TemporaryDirectory() as tmp:
+            exported = Path(tmp) / "paint-test.png"
+            exported.write_bytes(b"png")
+            with patch.object(main.storage, "load", return_value=sprite), patch.object(
+                main.png_export, "export_png", return_value=exported
+            ):
+                response = main.export_png(sprite.id, frame=0, scale=1)
+
+        self.assertEqual(response.headers["cache-control"], "no-store")
+
 
 if __name__ == "__main__":
     unittest.main()

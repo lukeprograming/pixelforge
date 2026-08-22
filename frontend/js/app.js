@@ -662,7 +662,7 @@ const Gallery = {
     const thumb = document.createElement("div");
     thumb.className = "gallery-thumb";
     const img = document.createElement("img");
-    img.src = Api.exportUrl(meta.id, 0, 1);
+    img.src = Api.exportUrl(meta.id, 0, 1, meta.updated_at);
     img.alt = meta.id;
     img.loading = "lazy";
     thumb.appendChild(img);
@@ -691,7 +691,7 @@ const Gallery = {
     const downloadBtn = document.createElement("a");
     downloadBtn.className = "btn";
     downloadBtn.textContent = "Baixar";
-    downloadBtn.href = Api.exportUrl(meta.id, 0, 1);
+    downloadBtn.href = Api.exportUrl(meta.id, 0, 1, meta.updated_at);
     downloadBtn.download = `${meta.id}.png`;
 
     const delBtn = document.createElement("button");

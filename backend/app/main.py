@@ -422,7 +422,12 @@ def export_png(sprite_id: str, frame: int = 0, scale: int = 1):
         raise HTTPException(400, "scale deve estar entre 1 e 32")
 
     path = png_export.export_png(sprite, frame_index=frame, scale=scale)
-    return FileResponse(path, media_type="image/png", filename=path.name)
+    return FileResponse(
+        path,
+        media_type="image/png",
+        filename=path.name,
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.get("/api/sprites/{sprite_id}/analyze")

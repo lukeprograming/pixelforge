@@ -135,6 +135,7 @@ const context = vm.createContext({
 
 const smokeSource = `
 async function runPaintUiSmoke() {
+  assert.match(Api.exportUrl("sprite cache", 0, 1, "2026-08-22T14:00:00"), /[?&]v=2026-08-22T14%3A00%3A00/);
   const created = await Api.createSprite("paint-ui-smoke", 128, 8, ["#111111ff", "#ffffffff"]);
   AppState.spriteId = created.id;
   SpriteCanvas.width = created.width;

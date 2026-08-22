@@ -202,7 +202,12 @@ input#sprite-w, input#sprite-h { width: 56px; }
   font-size: 11px;
 }
 
-.save-status { margin-left: auto; }
+.save-status {
+  white-space: nowrap;
+  font-size: 11px;
+  min-width: 122px;
+  text-align: center;
+}
 .save-status.pending { color: #e8b95f; }
 .save-status.saving { color: #7dc8ff; }
 .save-status.saved { color: var(--accent); }

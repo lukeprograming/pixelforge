@@ -143,8 +143,10 @@ const Api = {
     return res.json();
   },
 
-  exportUrl(id, frame = 0, scale = 1) {
-    return `/api/sprites/${encodeURIComponent(id)}/export.png?frame=${frame}&scale=${scale}`;
+  exportUrl(id, frame = 0, scale = 1, version = null) {
+    const params = new URLSearchParams({ frame, scale });
+    if (version) params.set("v", version);
+    return `/api/sprites/${encodeURIComponent(id)}/export.png?${params.toString()}`;
   },
 
   async armorActions() {
