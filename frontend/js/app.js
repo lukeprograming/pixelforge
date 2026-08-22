@@ -972,9 +972,18 @@ const ArmorGifPanel = {
     this.result.classList.add("hidden");
     if (this.scaleHint) this.scaleHint.textContent = "";
     try {
+      // O gerador lê o sprite persistido no backend, não a matriz local do
+      // canvas. Sincroniza antes de listar/selecionar para nunca gerar GIF da
+      // versão anterior quando o painel for aberto logo após uma edição.
+      if (AppState.spriteId && !(await saveCurrentSprite())) {
+        return this.showError("Não foi possível salvar o sprite atual antes de abrir o gerador.");
+      }
       const [sprites, actions] = await Promise.all([Api.listSpritesMeta(), Api.armorActions()]);
       this.spriteSelect.innerHTML = sprites.map((s) => `<option value="${s.id}">${s.id}</option>`).join("");
       this.actionSelect.innerHTML = actions.map((a) => `<option value="${a}">${a}</option>`).join("");
+      if (sprites.some((sprite) => sprite.id === AppState.spriteId)) {
+        this.spriteSelect.value = AppState.spriteId;
+      }
       this.detectScale();
     } catch (err) {
       this.showError("Erro ao carregar opções: " + err.message);
@@ -1000,6 +1009,9 @@ const ArmorGifPanel = {
     const format = this.formatSelect.value;
 
     this.error.classList.add("hidden");
+    if (spriteId === AppState.spriteId && !(await saveCurrentSprite())) {
+      return this.showError("Não foi possível salvar o sprite atual; GIF não gerado para evitar usar a versão antiga.");
+    }
     const url = Api.armorGenerateUrl(spriteId, action, inputScale, outputScale, format);
     try {
       const res = await fetch(url);

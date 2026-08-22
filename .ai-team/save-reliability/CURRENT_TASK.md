@@ -4,7 +4,7 @@ Owner: Codex CLI
 
 Reviewer: Product Owner
 
-Status: READY_FOR_REVIEW
+Status: APPROVED_FOR_MERGE
 
 ## Objective
 

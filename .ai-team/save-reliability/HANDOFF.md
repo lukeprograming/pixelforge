@@ -4,7 +4,10 @@ FROM: Codex CLI
 
 TO: Product Owner
 
-Status: READY_FOR_REVIEW
+Status: APPROVED
+
+O Product Owner autorizou integração e push em 2026-08-22 após confirmar que
+o teste anterior ainda havia sido executado contra a `main` antiga.
 
 ## Root cause
 
@@ -16,6 +19,8 @@ Status: READY_FOR_REVIEW
 - autosave no mouse-up, blur, aba oculta e após 800 ms sem novas edições;
 - indicador visível de alterações pendentes, salvando, salvo e erro;
 - botão Salvar faz sincronização integral do frame;
+- gerador de GIF salva primeiro o sprite aberto e o seleciona automaticamente;
+- geração é abortada com erro visível se a sincronização anterior falhar;
 - nova rota `PUT /api/sprites/{id}/frame/{frame}` com validação atômica;
 - aviso antes de fechar a página com alterações pendentes;
 - versionamento dos scripts no HTML para evitar cache antigo.
