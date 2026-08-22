@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import numpy as np
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -72,10 +72,11 @@ def list_sprites() -> List[str]:
 
 
 @app.get("/api/sprites/meta", response_model=List[SpriteSummary])
-def list_sprites_meta() -> List[SpriteSummary]:
+def list_sprites_meta(response: Response) -> List[SpriteSummary]:
     """Metadados leves de todos os sprites (sem a matriz de pixels), para a
     galeria do editor. Combine com GET /api/sprites/{id}/export.png pra
     thumbnail."""
+    response.headers["Cache-Control"] = "no-store"
     return storage.list_summaries()
 
 

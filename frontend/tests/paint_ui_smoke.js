@@ -42,6 +42,10 @@ async function fetchMock(url, options = {}) {
   const body = options.body ? JSON.parse(options.body) : null;
   requests.push({ method, pathname, body });
 
+  if (method === "GET" && pathname === "/api/sprites/meta") {
+    return response(200, []);
+  }
+
   if (method === "POST" && pathname === "/api/sprites") {
     const sprite = {
       id: body.id,
@@ -136,6 +140,8 @@ const context = vm.createContext({
 const smokeSource = `
 async function runPaintUiSmoke() {
   assert.match(Api.exportUrl("sprite cache", 0, 1, "2026-08-22T14:00:00"), /[?&]v=2026-08-22T14%3A00%3A00/);
+  await Api.listSpritesMeta();
+  assert.equal(requests.at(-1).pathname, "/api/sprites/meta");
   const created = await Api.createSprite("paint-ui-smoke", 128, 8, ["#111111ff", "#ffffffff"]);
   AppState.spriteId = created.id;
   SpriteCanvas.width = created.width;

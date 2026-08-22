@@ -11,13 +11,13 @@ const Api = {
   },
 
   async getSprite(id) {
-    const res = await fetch(`/api/sprites/${encodeURIComponent(id)}`);
+    const res = await fetch(`/api/sprites/${encodeURIComponent(id)}`, { cache: "no-store" });
     if (!res.ok) throw new Error(await res.text());
     return res.json();
   },
 
   async listSpritesMeta() {
-    const res = await fetch("/api/sprites/meta");
+    const res = await fetch(`/api/sprites/meta?v=${Date.now()}`, { cache: "no-store" });
     if (!res.ok) throw new Error(await res.text());
     return res.json();
   },

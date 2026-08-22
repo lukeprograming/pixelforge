@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Response
 
 from app import main, storage
 from app.models import Frame, FramePixelsUpdate, Sprite, StrokeEdit, StrokeRegion
@@ -113,6 +113,12 @@ class PaintPerformanceTests(unittest.TestCase):
             ):
                 response = main.export_png(sprite.id, frame=0, scale=1)
 
+        self.assertEqual(response.headers["cache-control"], "no-store")
+
+    def test_gallery_metadata_disables_browser_cache(self) -> None:
+        response = Response()
+        with patch.object(main.storage, "list_summaries", return_value=[]):
+            self.assertEqual(main.list_sprites_meta(response), [])
         self.assertEqual(response.headers["cache-control"], "no-store")
 
 
