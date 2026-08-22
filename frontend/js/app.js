@@ -17,7 +17,82 @@ const AppState = {
   // Estado é só do editor (não é salvo no backend) e reseta a cada troca de sprite.
   lockedColors: new Set(), // índices de paleta travados (protege TODO pixel daquela cor)
   lockedPixels: new Set(), // coordenadas "x,y" travadas, independente da cor
+
+  // Um traço comum é desenhado localmente e persistido como um único lote no
+  // mouse-up. A cadeia mantém a ordem caso o usuário comece outro traço antes
+  // da resposta do anterior chegar.
+  pendingStroke: null,
+  strokeFlushChain: Promise.resolve(),
 };
+
+function toolChangesPixels() {
+  return ["pencil", "eraser", "fill", "color-eraser"].includes(AppState.tool);
+}
+
+function beginPaintStroke() {
+  if (!AppState.spriteId || !toolChangesPixels()) return;
+  if (AppState.pendingStroke?.regions.length) void flushPaintStroke();
+  AppState.pendingStroke = {
+    spriteId: AppState.spriteId,
+    frame: AppState.activeFrameIndex ?? 0,
+    regions: [],
+  };
+  pushUndoSnapshot();
+}
+
+function queueStrokeRegions(regions) {
+  if (!regions.length || !AppState.spriteId) return;
+  const frame = AppState.activeFrameIndex ?? 0;
+  if (
+    !AppState.pendingStroke ||
+    AppState.pendingStroke.spriteId !== AppState.spriteId ||
+    AppState.pendingStroke.frame !== frame
+  ) {
+    AppState.pendingStroke = { spriteId: AppState.spriteId, frame, regions: [] };
+  }
+  AppState.pendingStroke.regions.push(
+    ...regions.map(([x0, y0, x1, y1, paletteIndex]) => ({
+      x0,
+      y0,
+      x1,
+      y1,
+      palette_index: paletteIndex,
+    }))
+  );
+}
+
+function flushPaintStroke() {
+  const stroke = AppState.pendingStroke;
+  AppState.pendingStroke = null;
+  if (!stroke?.regions.length) return AppState.strokeFlushChain;
+
+  // Remove somente repetições consecutivas. Uma deduplicação global seria
+  // incorreta para sequências como cor A -> B -> A na mesma região.
+  const regions = [];
+  let previousKey = null;
+  for (const region of stroke.regions) {
+    const key = `${region.x0},${region.y0},${region.x1},${region.y1},${region.palette_index}`;
+    if (key !== previousKey) regions.push(region);
+    previousKey = key;
+  }
+
+  AppState.strokeFlushChain = AppState.strokeFlushChain.then(async () => {
+    try {
+      await Api.applyStroke(stroke.spriteId, regions, stroke.frame);
+    } catch {
+      // Uma falha de transporte curta não deve perder silenciosamente um traço.
+      await new Promise((resolve) => setTimeout(resolve, 120));
+      try {
+        await Api.applyStroke(stroke.spriteId, regions, stroke.frame);
+      } catch (secondError) {
+        console.error("Falha ao persistir traço após nova tentativa:", secondError);
+        const out = document.getElementById("analyze-out");
+        if (out) out.textContent = `ERRO: o último traço não foi salvo (${secondError.message}).`;
+      }
+    }
+  });
+  return AppState.strokeFlushChain;
+}
 
 // true se o pixel (x,y) está protegido pela ferramenta de máscara -- travado
 // por coordenada exata, ou porque a cor atual dele está travada
@@ -126,29 +201,31 @@ async function paintPixel(x, y, meta = {}) {
   const hasLocks = AppState.lockedColors.size > 0 || AppState.lockedPixels.size > 0;
 
   if (hasLocks) {
-    // com a máscara ativa não dá pra mandar o quadrado inteiro de uma vez
-    // (o backend não sabe o que está travado) -- mantém pixel a pixel, mais
-    // lento mas garante que nenhum pixel travado seja sobrescrito
+    // Com máscara ativa, filtra localmente cada pixel protegido e envia os
+    // restantes no mesmo lote do traço.
     const cells = brushCoords(x, y, AppState.brushSize);
+    const edits = new Map();
     for (const [bx, by] of cells) {
-      await commitPixel(bx, by, idx);
+      if (!isLocked(bx, by)) edits.set(`${bx},${by}`, [bx, by]);
       if (AppState.mirrorX) {
         const mx = SpriteCanvas.width - 1 - bx;
-        await commitPixel(mx, by, idx);
+        if (!isLocked(mx, by)) edits.set(`${mx},${by}`, [mx, by]);
       }
     }
+    const pixelRegions = [...edits.values()].map(([bx, by]) => [bx, by, bx, by, idx]);
+    for (const [bx, by] of edits.values()) SpriteCanvas.pixels[by][bx] = idx;
+    SpriteCanvas.renderRegions(pixelRegions);
+    queueStrokeRegions(pixelRegions);
     return;
   }
 
   await paintBrushRegion(x, y, idx);
 }
 
-// pinta o quadrado inteiro do pincel de uma vez: atualiza a matriz local e
-// redesenha 1x (visual instantâneo), depois persiste com 1-2 chamadas ao
-// endpoint /region (1 por lado, se houver espelho) em vez de N×N chamadas
-// pixel a pixel -- era isso que fazia pincéis grandes "arrastarem" com
-// delay visível, esperando cada pixel confirmar no backend antes do próximo
-async function paintBrushRegion(cx, cy, idx) {
+// Pinta o quadrado inteiro localmente e acumula 1-2 regiões por carimbo.
+// A rede e o save só acontecem no fim do traço, então o mousemove nunca
+// espera serialização do sprite inteiro.
+function paintBrushRegion(cx, cy, idx) {
   const size = AppState.brushSize;
   const offset = Math.floor((size - 1) / 2);
   const x0 = Math.max(0, cx - offset);
@@ -171,16 +248,9 @@ async function paintBrushRegion(cx, cy, idx) {
       }
     }
   }
-  SpriteCanvas.render();
+  SpriteCanvas.renderRegions(regions);
 
-  const frame = AppState.activeFrameIndex ?? 0;
-  try {
-    await Promise.all(
-      regions.map(([rx0, ry0, rx1, ry1]) => Api.setRegion(AppState.spriteId, rx0, ry0, rx1, ry1, idx, frame))
-    );
-  } catch (err) {
-    console.error("Falha ao salvar região do pincel:", err);
-  }
+  queueStrokeRegions(regions.map(([rx0, ry0, rx1, ry1]) => [rx0, ry0, rx1, ry1, idx]));
 }
 
 async function commitPixel(x, y, idx) {
@@ -220,15 +290,30 @@ async function bucketFill(startX, startY, newIdx) {
   editable.forEach(([x, y]) => (SpriteCanvas.pixels[y][x] = newIdx));
   SpriteCanvas.render();
 
-  const frame = AppState.activeFrameIndex ?? 0;
-  // envia em lote via região não é seguro (fill não é retangular) -> manda pixel a pixel
+  // Converte os pixels do fill em corridas horizontais; o backend aplica todas
+  // em uma única transação/save junto com o restante do gesto.
+  const byRow = new Map();
   for (const [x, y] of editable) {
-    try {
-      await Api.setPixel(AppState.spriteId, x, y, newIdx, frame);
-    } catch (err) {
-      console.error("Falha ao salvar pixel do fill:", err);
+    if (!byRow.has(y)) byRow.set(y, []);
+    byRow.get(y).push(x);
+  }
+  const regions = [];
+  for (const [y, xs] of byRow) {
+    xs.sort((a, b) => a - b);
+    let start = xs[0];
+    let previous = xs[0];
+    for (let i = 1; i <= xs.length; i++) {
+      const x = xs[i];
+      if (x === previous + 1) {
+        previous = x;
+        continue;
+      }
+      regions.push([start, y, previous, y, newIdx]);
+      start = x;
+      previous = x;
     }
   }
+  queueStrokeRegions(regions);
 }
 
 function pushUndoSnapshot() {
@@ -1026,13 +1111,17 @@ document.addEventListener("DOMContentLoaded", () => {
       : "x: -, y: -";
   };
 
-  // registra undo no início de cada traço (mousedown)
-  document.getElementById("sprite-canvas").addEventListener("mousedown", pushUndoSnapshot);
+  // Capture roda antes do listener de desenho do canvas: o snapshot de undo e
+  // a transação começam antes do primeiro pixel do gesto ser alterado.
+  document.getElementById("sprite-canvas").addEventListener("mousedown", (event) => {
+    if (event.button === 0 && !SpriteCanvas.isPanTool) beginPaintStroke();
+  }, true);
 
   // ao soltar o botão do mouse, se estiver no modo Animated, resincroniza o
   // frame ativo no sprite completo em memória e atualiza as miniaturas da
   // grade (feito no fim do traço, não a cada pixel, por custo)
   window.addEventListener("mouseup", () => {
+    void flushPaintStroke();
     if (AppState.mode === "animated" && AppState.animatedSprite) {
       AppState.animatedSprite.frames[AppState.activeFrameIndex].pixels = SpriteCanvas.pixels.map((r) =>
         r.slice()
@@ -1040,6 +1129,7 @@ document.addEventListener("DOMContentLoaded", () => {
       AnimatedGrid.render();
     }
   });
+  window.addEventListener("blur", () => void flushPaintStroke());
 
   document.querySelectorAll(".tool-btn").forEach((btn) => {
     btn.addEventListener("click", () => setActiveTool(btn.dataset.tool));

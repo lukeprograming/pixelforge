@@ -69,6 +69,8 @@ pixelforge/
   cores usadas; checkbox "Travar em 30 cores" pra destravar o limite
   por sprite quando necessário (ex: importar referência rica em cor)
 - Undo/redo (pilha de snapshots)
+- Traços do pincel são desenhados localmente e persistidos em um único lote no
+  mouse-up, com redraw limitado às regiões tocadas
 - Modo Animated: grade 2D de frames com duplicação em qualquer direção
   (esquerda/direita/cima/baixo), separado do sprite estático de origem
 - Camada de referência (decalque): importa uma imagem, exibida por

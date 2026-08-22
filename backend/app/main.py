@@ -38,6 +38,7 @@ from .models import (
     SpriteCreate,
     SpriteSummary,
     SoundEffectCreate,
+    StrokeEdit,
 )
 
 _GRID_DIRECTIONS = {
@@ -210,6 +211,47 @@ def set_region(sprite_id: str, edit: RegionEdit) -> Sprite:
 
     storage.save(sprite)
     return sprite
+
+
+@app.patch("/api/sprites/{sprite_id}/stroke")
+def apply_stroke(sprite_id: str, edit: StrokeEdit) -> dict:
+    """Aplica todas as regiões de um gesto e persiste o sprite uma única vez.
+
+    O frontend desenha otimisticamente enquanto o mouse está pressionado e envia
+    este lote no mouse-up. Todas as operações são validadas antes da primeira
+    mutação, evitando traços parcialmente aplicados quando o payload é inválido.
+    """
+    sprite = _get_sprite_or_404(sprite_id)
+    if not (0 <= edit.frame < len(sprite.frames)):
+        raise HTTPException(400, "Frame inexistente")
+
+    normalized = []
+    for region in edit.regions:
+        _check_bounds(sprite, region.x0, region.y0)
+        _check_bounds(sprite, region.x1, region.y1)
+        if not (-1 <= region.palette_index < len(sprite.palette)):
+            raise HTTPException(400, "Índice de paleta inexistente")
+        normalized.append((
+            min(region.x0, region.x1),
+            min(region.y0, region.y1),
+            max(region.x0, region.x1),
+            max(region.y0, region.y1),
+            region.palette_index,
+        ))
+
+    pixels = sprite.frames[edit.frame].pixels
+    for x0, y0, x1, y1, palette_index in normalized:
+        for y in range(y0, y1 + 1):
+            for x in range(x0, x1 + 1):
+                pixels[y][x] = palette_index
+
+    storage.save(sprite)
+    return {
+        "updated": sprite.id,
+        "frame": edit.frame,
+        "regions_applied": len(normalized),
+        "updated_at": sprite.updated_at,
+    }
 
 
 @app.post("/api/sprites/{sprite_id}/palette", response_model=Sprite)

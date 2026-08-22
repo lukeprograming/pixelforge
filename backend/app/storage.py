@@ -37,7 +37,9 @@ def save(sprite: Sprite) -> None:
     # se sobrepõem (ex.: pincel rápido disparando vários PATCH /pixel em
     # sequência), já que um write_text() direto pode intercalar duas escritas
     tmp_path = path.with_suffix(f".{uuid.uuid4().hex}.tmp")
-    tmp_path.write_text(sprite.model_dump_json(indent=2), encoding="utf-8")
+    # O arquivo é armazenamento interno, não documentação: JSON compacto reduz
+    # bastante CPU, bytes escritos e tempo sob I/O em sprites grandes.
+    tmp_path.write_text(sprite.model_dump_json(), encoding="utf-8")
     os.replace(tmp_path, path)
 
 

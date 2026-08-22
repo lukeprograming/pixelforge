@@ -76,6 +76,22 @@ Preenche todo o retângulo `[x0..x1] × [y0..y1]` (inclusive) com a
 mesma cor. Útil para bases sólidas antes de refinar pixel a pixel.
 **Não** é flood fill — para formas irregulares, edite pixel a pixel.
 
+### Aplicar um traço em lote
+```
+PATCH /api/sprites/{id}/stroke
+{
+  "frame": 0,
+  "regions": [
+    { "x0": 4, "y0": 4, "x1": 8, "y1": 6, "palette_index": 1 },
+    { "x0": 9, "y0": 5, "x1": 12, "y1": 7, "palette_index": 1 }
+  ]
+}
+```
+Valida todas as regiões antes de alterar o frame, aplica na ordem recebida e
+persiste o sprite uma única vez. Use este endpoint para gestos compostos ou
+edições em lote: ele evita uma serialização completa do sprite por região e
+retorna apenas um ACK leve, não a matriz inteira.
+
 ### Atualizar paleta
 ```
 POST /api/sprites/{id}/palette

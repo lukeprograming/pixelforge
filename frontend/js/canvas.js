@@ -385,6 +385,31 @@ const SpriteCanvas = {
     LockOverlay.render();
   },
 
+  // Redesenha somente os pixels tocados por um carimbo do pincel. Em canvases
+  // grandes, refazer a matriz inteira a cada mousemove era outro custo evitável.
+  renderRegions(regions) {
+    const ctx = this.ctx;
+    const zoom = this.zoom;
+    for (const [rawX0, rawY0, rawX1, rawY1] of regions) {
+      const x0 = Math.max(0, Math.min(rawX0, rawX1));
+      const y0 = Math.max(0, Math.min(rawY0, rawY1));
+      const x1 = Math.min(this.width - 1, Math.max(rawX0, rawX1));
+      const y1 = Math.min(this.height - 1, Math.max(rawY0, rawY1));
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const px = x * zoom;
+          const py = y * zoom;
+          ctx.clearRect(px, py, zoom, zoom);
+          const idx = this.pixels[y][x];
+          if (idx === undefined || idx < 0) continue;
+          ctx.fillStyle = hexToCss(this.palette[idx] ?? "#ff00ff");
+          ctx.fillRect(px, py, zoom, zoom);
+        }
+      }
+    }
+    LockOverlay.render();
+  },
+
   _renderChecker() {
     const ctx = this.checkerCtx;
     const mode = this.bgMode || "dark";

@@ -361,3 +361,13 @@ Fluxo atual:
 11. Node.js 20 foi instalado na VPS nesta sessão só pra rodar um teste
     unitário pontual — não tinha `node` nem browser headless antes.
     Ainda não há suite de testes automatizados de frontend formalizada.
+## Performance do editor — traço transacional (2026-08-22)
+
+- Novo `PATCH /api/sprites/{id}/stroke`: valida e aplica todas as regiões de um
+  gesto em ordem, com uma única gravação atômica.
+- Pincel, borracha, espelho, máscara e fill acumulam mudanças localmente até o
+  mouse-up; traços consecutivos são persistidos em ordem.
+- Canvas usa redraw parcial durante o arraste.
+- Storage JSON passou a compacto; benchmark 512x512: 3,42 MB -> 0,53 MB
+  (-84,6%) e 9,6 ms -> 2,4 ms na serialização isolada.
+- Testes automatizados e API real local aprovados; aguarda revisão do Claude.

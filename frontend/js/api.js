@@ -67,6 +67,16 @@ const Api = {
     return res.json();
   },
 
+  async applyStroke(id, regions, frame = 0) {
+    const res = await fetch(`/api/sprites/${encodeURIComponent(id)}/stroke`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ frame, regions }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
   async updatePalette(id, palette, locked = null) {
     const res = await fetch(`/api/sprites/${encodeURIComponent(id)}/palette`, {
       method: "POST",
